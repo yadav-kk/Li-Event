@@ -6,7 +6,7 @@ returns boolean as $$
 begin
     return exists (
         select 1 from public.user_roles
-        where profile_id = auth.uid() and role_id = p_role
+        where profile_id::text = auth.uid()::text and role_id = p_role
     );
 end;
 $$ language plpgsql security definer;
@@ -25,7 +25,7 @@ declare
 begin
     select centre_id into v_centre_id
     from public.profiles
-    where id = auth.uid();
+    where id::text = auth.uid()::text;
     return v_centre_id;
 end;
 $$ language plpgsql security definer;
@@ -61,7 +61,7 @@ create policy "Allow users to read all profiles" on public.profiles
     for select using (auth.role() = 'authenticated');
 
 create policy "Allow users to update own profile" on public.profiles
-    for update using (auth.uid() = id);
+    for update using (auth.uid()::text = id::text);
 
 create policy "Admins can manage profiles" on public.profiles
     for all using (public.is_admin());
@@ -103,12 +103,12 @@ create policy "Admins can manage students" on public.students
 
 create policy "Centre In-Charge can insert student" on public.students
     for insert with check (
-        public.has_role('centre_incharge') and centre_id = public.get_user_centre()
+        public.has_role('centre_incharge') and centre_id::text = public.get_user_centre()::text
     );
 
 create policy "Centre In-Charge can update student" on public.students
     for update using (
-        public.has_role('centre_incharge') and centre_id = public.get_user_centre()
+        public.has_role('centre_incharge') and centre_id::text = public.get_user_centre()::text
     );
 
 -- Events / Stages / Assessments / Criteria table policies
@@ -147,7 +147,7 @@ create policy "Centre In-Charge can register event participants" on public.event
     for insert with check (
         public.has_role('centre_incharge') and exists (
             select 1 from public.students s
-            where s.id = student_id and s.centre_id = public.get_user_centre()
+            where s.id::text = student_id::text and s.centre_id::text = public.get_user_centre()::text
         )
     );
 
@@ -155,7 +155,7 @@ create policy "Centre In-Charge can update event participants" on public.event_p
     for update using (
         public.has_role('centre_incharge') and exists (
             select 1 from public.students s
-            where s.id = student_id and s.centre_id = public.get_user_centre()
+            where s.id::text = student_id::text and s.centre_id::text = public.get_user_centre()::text
         )
     );
 
@@ -182,7 +182,7 @@ create policy "Admins can manage scores" on public.assessment_scores
 
 create policy "Judges can write own scores" on public.assessment_scores
     for all using (
-        public.has_role('judge') and judge_id = auth.uid() and status in ('DRAFT', 'SUBMITTED')
+        public.has_role('judge') and judge_id::text = auth.uid()::text and status in ('DRAFT', 'SUBMITTED')
     );
 
 -- Criteria Scores policies
@@ -196,7 +196,7 @@ create policy "Judges can write criteria scores" on public.criteria_scores
     for all using (
         exists (
             select 1 from public.assessment_scores s
-            where s.id = score_id and s.judge_id = auth.uid() and s.status in ('DRAFT', 'SUBMITTED')
+            where s.id::text = score_id::text and s.judge_id::text = auth.uid()::text and s.status in ('DRAFT', 'SUBMITTED')
         )
     );
 
@@ -209,7 +209,7 @@ create policy "Admins can manage evidence" on public.evidence
 
 create policy "Centre In-Charge can upload evidence" on public.evidence
     for insert with check (
-        public.has_role('centre_incharge') and centre_id = public.get_user_centre()
+        public.has_role('centre_incharge') and centre_id::text = public.get_user_centre()::text
     );
 
 -- Audit logs policies
