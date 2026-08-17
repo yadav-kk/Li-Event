@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enter Scores - Assessor Panel</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase & Auth -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="judge-dashboard.html" class="nav-link active"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link"><span>Results & Rankings</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1 id="assessmentHeader">Score Entry Matrix</h1>
+                    <p id="assessmentSub">Stage: Centre Screening | Max Marks: 20</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <!-- Score Sheet Controls -->
+                <div class="card" style="margin-bottom: 24px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">Active Assessor:</span>
+                        <strong class="user-name-display" style="margin-left: 4px;">Assessor</strong>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" id="saveDraftBtn" onclick="saveAllScores('DRAFT')">Save Drafts</button>
+                        <button class="btn btn-primary" id="submitBtn" onclick="saveAllScores('SUBMITTED')">Submit Score Sheet</button>
+                    </div>
+                </div>
+
+                <div id="errorBanner" style="display: none; padding: 12px; border-radius: var(--radius-sm); background-color: var(--danger-light); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.85rem; margin-bottom: 24px;"></div>
+                <div id="successBanner" style="display: none; padding: 12px; border-radius: var(--radius-sm); background-color: var(--success-light); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); font-size: 0.85rem; margin-bottom: 24px;"></div>
+
+                <!-- Main Matrix Card -->
+                <div class="card">
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="scoreMatrixTable">
+                            <thead>
+                                <tr id="matrixHeader">
+                                    <th>Student ID</th>
+                                    <th>Student Name</th>
+                                    <!-- Dynamic criteria columns header goes here -->
+                                    <th>Total Score</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading participants matrix...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Core Score Entry Matrix Handler -->
+    <script>
+        let assessmentId = '';
+        let criteriaList = [];
+        let participants = [];
+        let scoreRecords = {}; // mapping: stage_participant_id -> { score_id, total, remarks, criteria: { crit_id: val } }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            // Extract assessment_id from URL query string
+            const params = new URLSearchParams(window.location.search);
+            assessmentId = params.get('assessment_id');
+
+            if (!assessmentId) {
+                alert("No assessment specified.");
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            await loadMatrixStructure();
+        });
+
+        async function loadMatrixStructure() {
+            if (!window.supabaseClient) return;
+
+            try {
+                // 1. Fetch assessment configuration details
+                const { data: assess, error: assErr } = await window.supabaseClient
+                    .from('event_assessments')
+                    .select('*, stage_id!inner(name, event_id!inner(name))')
+                    .eq('id', assessmentId)
+                    .single();
+
+                if (assErr) throw assErr;
+
+                document.getElementById('assessmentHeader').textContent = `Score Entry: ${assess.name}`;
+                document.getElementById('assessmentSub').textContent = `Event: ${assess.stage_id.event_id.name} | Stage: ${assess.stage_id.name} | Max Marks: ${assess.max_marks}`;
+
+                // 2. Fetch assessment criteria params
+                const { data: criteria, error: critErr } = await window.supabaseClient
+                    .from('assessment_criteria')
+                    .select('*')
+                    .eq('assessment_id', assessmentId)
+                    .order('sequence', { ascending: true });
+
+                if (critErr) throw critErr;
+                criteriaList = criteria;
+
+                // Render dynamic criteria columns in table headers
+                const headerRow = document.getElementById('matrixHeader');
+                const totalCol = headerRow.lastElementChild.previousElementSibling;
+                
+                criteriaList.forEach(crit => {
+                    const th = document.createElement('th');
+                    th.innerHTML = `${crit.name}<br><small style="color: var(--text-secondary); font-size: 0.75rem;">Max: ${crit.max_marks}</small>`;
+                    // Insert before Total column
+                    headerRow.insertBefore(th, totalCol);
+                });
+
+                // 3. Fetch Stage Participants
+                // If judge belongs to a specific centre, filter participants by centre!
+                const profile = window.Auth.getUserProfile();
+                const filterCentre = profile.centre_id;
+
+                let query = window.supabaseClient
+                    .from('stage_participants')
+                    .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id))')
+                    .eq('stage_id', assess.stage_id);
+
+                if (filterCentre) {
+                    query = query.eq('participant_id.student_id.centre_id', filterCentre);
+                }
+
+                const { data: spList, error: spErr } = await query;
+                if (spErr) throw spErr;
+                participants = spList;
+
+                // 4. Fetch existing scores entered for this assessment by this judge
+                const { data: existingScores, error: scErr } = await window.supabaseClient
+                    .from('assessment_scores')
+                    .select('*, criteria_scores(*)')
+                    .eq('assessment_id', assessmentId)
+                    .eq('judge_id', profile.id);
+
+                if (scErr) throw scErr;
+
+                // Map existing scores
+                existingScores.forEach(es => {
+                    const critScores = {};
+                    es.criteria_scores.forEach(cs => {
+                        critScores[cs.criteria_id] = cs.score;
+                    });
+                    
+                    scoreRecords[es.stage_participant_id] = {
+                        score_id: es.id,
+                        total_score: es.total_score,
+                        remarks: es.remarks || '',
+                        status: es.status,
+                        criteria: critScores
+                    };
+                });
+
+                renderScoreMatrix();
+
+            } catch (err) {
+                console.error("Error loading matrix:", err);
+                document.getElementById('errorBanner').textContent = err.message || "Failed to load score sheets.";
+                document.getElementById('errorBanner').style.display = 'block';
+            }
+        }
+
+        function renderScoreMatrix() {
+            const tbody = document.querySelector('#scoreMatrixTable tbody');
+            tbody.innerHTML = '';
+
+            if (participants.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${4 + criteriaList.length}" style="text-align: center; color: var(--text-muted);">No student participants mapped to this stage for your centre.</td></tr>`;
+                return;
+            }
+
+            participants.forEach(sp => {
+                const sInfo = sp.participant_id.student_id;
+                const rec = scoreRecords[sp.id] || { total_score: 0, remarks: '', status: 'DRAFT', criteria: {} };
+                
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-sp-id', sp.id);
+                
+                let html = `
+                    <td>${sInfo.student_id}</td>
+                    <td><strong>${sInfo.name}</strong></td>
+                `;
+
+                // Dynamic inputs for each criteria
+                criteriaList.forEach(crit => {
+                    const scoreVal = rec.criteria[crit.id] !== undefined ? rec.criteria[crit.id] : '';
+                    const isLocked = rec.status === 'LOCKED' || rec.status === 'SUBMITTED';
+                    
+                    html += `
+                        <td>
+                            <input class="form-control crit-input" 
+                                   type="number" 
+                                   step="0.5" 
+                                   min="0" 
+                                   max="${crit.max_marks}" 
+                                   data-crit-id="${crit.id}" 
+                                   data-max="${crit.max_marks}"
+                                   value="${scoreVal}"
+                                   ${isLocked ? 'disabled' : ''}
+                                   oninput="updateStudentTotalScore(this.parentElement.parentElement)"
+                                   style="width: 80px; text-align: right; padding: 6px 10px;">
+                        </td>
+                    `;
+                });
+
+                const isLocked = rec.status === 'LOCKED' || rec.status === 'SUBMITTED';
+                
+                html += `
+                    <td>
+                        <input class="form-control total-display" 
+                               type="text" 
+                               value="${rec.total_score}" 
+                               disabled 
+                               style="width: 80px; font-weight: bold; text-align: right; background-color: rgba(255,255,255,0.05);">
+                    </td>
+                    <td>
+                        <input class="form-control remarks-input" 
+                               type="text" 
+                               value="${rec.remarks}" 
+                               placeholder="Add feedback"
+                               ${isLocked ? 'disabled' : ''}
+                               style="min-width: 140px;">
+                    </td>
+                `;
+
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStudentTotalScore(rowEl) {
+            let total = 0;
+            const inputs = rowEl.querySelectorAll('.crit-input');
+            inputs.forEach(inp => {
+                const val = parseFloat(inp.value) || 0;
+                total += val;
+            });
+            rowEl.querySelector('.total-display').value = total.toFixed(2);
+        }
+
+        async function saveAllScores(statusString) {
+            if (!window.supabaseClient) return;
+
+            const errorDiv = document.getElementById('errorBanner');
+            const successDiv = document.getElementById('successBanner');
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            const profile = window.Auth.getUserProfile();
+            const rows = document.querySelectorAll('#scoreMatrixTable tbody tr');
+
+            if (statusString === 'SUBMITTED') {
+                const conf = confirm("Are you sure you want to Submit this score sheet? This will lock edit access for you.");
+                if (!conf) return;
+            }
+
+            try {
+                // Loop through rows and insert
+                for (const row of rows) {
+                    const spId = row.getAttribute('data-sp-id');
+                    if (!spId) continue;
+
+                    const totalScore = parseFloat(row.querySelector('.total-display').value) || 0;
+                    const remarks = row.querySelector('.remarks-input').value.trim();
+                    const inputs = row.querySelectorAll('.crit-input');
+
+                    // 1. Check if score matrix is complete/valid
+                    let skipRow = false;
+                    const critData = [];
+                    
+                    for (const inp of inputs) {
+                        const critId = inp.getAttribute('data-crit-id');
+                        const maxVal = parseFloat(inp.getAttribute('data-max'));
+                        const valStr = inp.value.trim();
+
+                        if (valStr === '') {
+                            // If draft, we allow incomplete records. If submitted, require all fields
+                            if (statusString === 'SUBMITTED') {
+                                throw new Error("All criteria fields must be filled before submitting scores.");
+                            } else {
+                                skipRow = true;
+                                break;
+                            }
+                        }
+
+                        const val = parseFloat(valStr) || 0;
+                        if (val < 0 || val > maxVal) {
+                            throw new Error(`Score limit error: criteria score ${val} exceeds max ${maxVal}.`);
+                        }
+                        
+                        critData.push({ critId, val });
+                    }
+
+                    if (skipRow) continue; // Skip saving empty drafts for specific rows
+
+                    // 2. Fetch or Create primary score record in assessment_scores
+                    const existingRec = scoreRecords[spId];
+                    let scoreId;
+
+                    if (existingRec && existingRec.score_id) {
+                        // Update
+                        scoreId = existingRec.score_id;
+                        const { error: updErr } = await window.supabaseClient
+                            .from('assessment_scores')
+                            .update({
+                                total_score: totalScore,
+                                remarks,
+                                status: statusString
+                            })
+                            .eq('id', scoreId);
+
+                        if (updErr) throw updErr;
+                    } else {
+                        // Insert
+                        const { data: newScore, error: insErr } = await window.supabaseClient
+                            .from('assessment_scores')
+                            .insert({
+                                assessment_id: assessmentId,
+                                stage_participant_id: spId,
+                                judge_id: profile.id,
+                                total_score: totalScore,
+                                remarks,
+                                status: statusString
+                            })
+                            .select()
+                            .single();
+
+                        if (insErr) throw insErr;
+                        scoreId = newScore.id;
+                    }
+
+                    // 3. Upsert criteria subscores
+                    for (const cd of critData) {
+                        const { error: crErr } = await window.supabaseClient
+                            .from('criteria_scores')
+                            .upsert({
+                                score_id: scoreId,
+                                criteria_id: cd.critId,
+                                score: cd.val
+                            }, {
+                                onConflict: 'score_id,criteria_id'
+                            });
+
+                        if (crErr) throw crErr;
+                    }
+                }
+
+                successDiv.textContent = `Score sheets successfully saved as ${statusString}!`;
+                successDiv.style.display = 'block';
+
+                // Reload layout details
+                await loadMatrixStructure();
+
+            } catch (err) {
+                console.error("Score matrix save error:", err);
+                errorDiv.textContent = err.message || "Failed to update participant score sheet.";
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

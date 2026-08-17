@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Directory - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Students Directory</h1>
+                    <p>Enroll and list Class V students across centres.</p>
+                </div>
+                <div class="header-actions" data-allowed-roles="super_admin, prog_admin, centre_incharge">
+                    <button class="btn btn-secondary" onclick="toggleImportCard()">Bulk Import CSV</button>
+                    <button class="btn btn-primary" onclick="openEnrollmentModal()">+ Register Student</button>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <!-- CSV Bulk Import Pane -->
+                <div class="card" id="importPane" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
+                    <h3 class="card-title">Bulk Import Students from CSV</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        CSV columns: <code>Student Name</code>, <code>Gender</code>, <code>Class</code>, <code>Centre Code</code>, <code>School Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.
+                    </p>
+                    
+                    <div class="form-group" style="margin-top: 12px;">
+                        <input class="form-control" type="file" id="csvFileInput" accept=".csv" style="padding: 12px;">
+                    </div>
+                    
+                    <div id="importPreview" style="display: none; margin-top: 12px; font-size: 0.9rem;">
+                        <p id="previewCounts">Total Rows: 0 | Valid: 0 | Invalid: 0</p>
+                        <div class="table-container" style="max-height: 200px; overflow-y: auto; margin-top: 8px;">
+                            <table class="data-table" id="previewTable" style="min-width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Gender</th>
+                                        <th>Class</th>
+                                        <th>Centre</th>
+                                        <th>School</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+                        <button class="btn btn-secondary" onclick="toggleImportCard()">Cancel</button>
+                        <button class="btn btn-primary" id="confirmImportBtn" disabled onclick="executeBulkImport()">Execute Import</button>
+                    </div>
+                </div>
+
+                <!-- Registration Modal dialog (Inline absolute wrapper for simple SPA layouts) -->
+                <div class="card" id="enrollmentModal" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
+                    <h3 class="card-title">Enroll New Student</h3>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                    
+                    <form id="enrollStudentForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="studName">Full Name</label>
+                                <input class="form-control" type="text" id="studName" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="studGender">Gender</label>
+                                <select class="form-control" id="studGender">
+                                    <option value="M">Male</option>
+                                    <option value="F">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="studDOB">Date of Birth</label>
+                                <input class="form-control" type="date" id="studDOB">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="studClass">Class</label>
+                                <input class="form-control" type="text" id="studClass" value="V" readonly>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="studCentre">Centre</label>
+                                <select class="form-control" id="studCentre" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="studSchool">School</label>
+                                <select class="form-control" id="studSchool" required></select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="studGuardian">Guardian Name</label>
+                                <input class="form-control" type="text" id="studGuardian">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="studMobile">Guardian Mobile</label>
+                                <input class="form-control" type="text" id="studMobile">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="studLanguage">Language</label>
+                            <input class="form-control" type="text" id="studLanguage" value="Hindi">
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+                            <button class="btn btn-secondary" type="button" onclick="closeEnrollmentModal()">Cancel</button>
+                            <button class="btn btn-primary" type="submit">Submit Registration</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Directory Grid List -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 8px;">
+                        <h3 class="card-title">Active Student Roster</h3>
+                        
+                        <div style="display: flex; gap: 12px;">
+                            <select class="form-control" id="filterCentre" style="width: 180px;">
+                                <option value="">All Centres</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="studentsTable">
+                            <thead>
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Gender</th>
+                                    <th>Class</th>
+                                    <th>Centre</th>
+                                    <th>School</th>
+                                    <th>Guardian Mobile</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Fetching students list...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Student Setup Core JS -->
+    <script>
+        let centres = [];
+        let schools = [];
+        let importedParsedRows = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'centre_incharge', 'coordinator']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            // Bind listeners
+            document.getElementById('enrollStudentForm').addEventListener('submit', handleSingleRegistration);
+            document.getElementById('filterCentre').addEventListener('change', loadStudentsList);
+            document.getElementById('csvFileInput').addEventListener('change', handleCSVFileSelect);
+
+            await fetchCentresSchoolsData();
+            await loadStudentsList();
+        });
+
+        async function fetchCentresSchoolsData() {
+            if (!window.supabaseClient) return;
+
+            try {
+                // Fetch centres
+                const { data: cData } = await window.supabaseClient.from('centres').select('*').eq('status', 'active');
+                centres = cData || [];
+
+                // Fetch schools
+                const { data: sData } = await window.supabaseClient.from('schools').select('*').eq('status', 'active');
+                schools = sData || [];
+
+                // Populating dropdowns
+                const filterCentre = document.getElementById('filterCentre');
+                const studCentre = document.getElementById('studCentre');
+                const studSchool = document.getElementById('studSchool');
+
+                // If user is a Centre Incharge, lock their centre selection!
+                const profile = window.Auth.getUserProfile();
+                const userCentre = profile.centre_id;
+
+                centres.forEach(c => {
+                    if (userCentre && c.id !== userCentre) return; // Skip other centres
+                    
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.centre_name} (${c.centre_code})`;
+                    studCentre.appendChild(opt);
+
+                    const filterOpt = document.createElement('option');
+                    filterOpt.value = c.id;
+                    filterOpt.textContent = c.centre_name;
+                    filterCentre.appendChild(filterOpt);
+                });
+
+                if (userCentre) {
+                    filterCentre.value = userCentre;
+                    filterCentre.disabled = true;
+                }
+
+                // Populate schools based on selected centre
+                updateSchoolDropdown();
+                studCentre.addEventListener('change', updateSchoolDropdown);
+
+            } catch (err) {
+                console.error("Error fetching dependencies:", err);
+            }
+        }
+
+        function updateSchoolDropdown() {
+            const selectedCentre = document.getElementById('studCentre').value;
+            const studSchool = document.getElementById('studSchool');
+            studSchool.innerHTML = '';
+
+            const filteredSchools = schools.filter(s => s.centre_id === selectedCentre);
+            filteredSchools.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.school_name} (${s.school_type})`;
+                studSchool.appendChild(opt);
+            });
+        }
+
+        async function loadStudentsList() {
+            if (!window.supabaseClient) return;
+
+            const selectedCentre = document.getElementById('filterCentre').value;
+            const tbody = document.querySelector('#studentsTable tbody');
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Refreshing list...</td></tr>`;
+
+            try {
+                let query = window.supabaseClient
+                    .from('students')
+                    .select('*, centres(centre_name), schools(school_name)')
+                    .order('created_at', { ascending: false });
+
+                if (selectedCentre) {
+                    query = query.eq('centre_id', selectedCentre);
+                }
+
+                const { data: students, error } = await query;
+                if (error) throw error;
+
+                tbody.innerHTML = '';
+
+                if (students && students.length > 0) {
+                    students.forEach(s => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${s.student_id}</strong></td>
+                            <td>${s.name}</td>
+                            <td>${s.gender}</td>
+                            <td>Class ${s.class}</td>
+                            <td>${s.centres ? s.centres.centre_name : 'N/A'}</td>
+                            <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
+                            <td>${s.guardian_mobile || 'N/A'}</td>
+                            <td><span class="badge badge-completed">${s.status}</span></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No student records found.</td></tr>`;
+                }
+
+            } catch (err) {
+                console.error("Error fetching students roster:", err);
+            }
+        }
+
+        function toggleImportCard() {
+            const pane = document.getElementById('importPane');
+            pane.style.display = pane.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function openEnrollmentModal() {
+            document.getElementById('enrollmentModal').style.display = 'block';
+        }
+
+        function closeEnrollmentModal() {
+            document.getElementById('enrollmentModal').style.display = 'none';
+            document.getElementById('enrollStudentForm').reset();
+        }
+
+        async function handleSingleRegistration(e) {
+            e.preventDefault();
+            if (!window.supabaseClient) return;
+
+            // Generate structured GT-LIT student code: GT-LIT-2026-XXXXXX
+            // For simple implementation, we generate a random 6-digit number to guarantee uniqueness
+            const suffix = Math.floor(100000 + Math.random() * 900000);
+            const academicYear = "2026";
+            const studentIdCode = `GT-LIT-${academicYear}-${suffix}`;
+
+            const name = document.getElementById('studName').value.trim();
+            const gender = document.getElementById('studGender').value;
+            const dob = document.getElementById('studDOB').value || null;
+            const targetClass = document.getElementById('studClass').value;
+            const centreId = document.getElementById('studCentre').value;
+            const schoolId = document.getElementById('studSchool').value || null;
+            const guardianName = document.getElementById('studGuardian').value.trim();
+            const guardianMobile = document.getElementById('studMobile').value.trim();
+            const language = document.getElementById('studLanguage').value.trim();
+
+            try {
+                // Insert Student
+                const { data: student, error: insErr } = await window.supabaseClient
+                    .from('students')
+                    .insert({
+                        student_id: studentIdCode,
+                        name,
+                        gender,
+                        date_of_birth: dob,
+                        class: targetClass,
+                        centre_id: centreId,
+                        school_id: schoolId,
+                        guardian_name: guardianName,
+                        guardian_mobile: guardianMobile,
+                        language,
+                        status: 'active'
+                    })
+                    .select()
+                    .single();
+
+                if (insErr) throw insErr;
+
+                // Also register them directly to the default seeded Active Event: GT-LIT-2026 (e9000000-0000-0000-0000-000000000001)
+                const { data: eventPart, error: regErr } = await window.supabaseClient
+                    .from('event_participants')
+                    .insert({
+                        event_id: 'e9000000-0000-0000-0000-000000000001',
+                        student_id: student.id,
+                        registration_number: `REG-2026-${suffix}`,
+                        registration_status: 'APPROVED',
+                        eligibility_status: 'ELIGIBLE',
+                        current_stage_id: 'es900000-0001-0000-0000-000000000001' // Stage 1 Screening
+                    })
+                    .select()
+                    .single();
+
+                if (regErr) throw regErr;
+
+                // Bind student to Stage 1 stage_participants
+                const { error: spErr } = await window.supabaseClient
+                    .from('stage_participants')
+                    .insert({
+                        stage_id: 'es900000-0001-0000-0000-000000000001',
+                        participant_id: eventPart.id,
+                        qualification_status: 'PENDING',
+                        attendance: 'PRESENT'
+                    });
+
+                if (spErr) throw spErr;
+
+                alert(`Student enrolled successfully! ID: ${studentIdCode}`);
+                closeEnrollmentModal();
+                await loadStudentsList();
+
+            } catch (err) {
+                console.error("Enrollment failed:", err);
+                alert("Database insert error: " + err.message);
+            }
+        }
+
+        // CSV parsing and importing (SRS Section 27)
+        function handleCSVFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const text = evt.target.result;
+                parseCSVText(text);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSVText(text) {
+            const rows = text.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+            if (rows.length < 2) {
+                alert("Invalid CSV format. Must contain headers and records.");
+                return;
+            }
+
+            // Headers: Student Name, Gender, Class, Centre Code, School Code, Guardian Name, Guardian Mobile, Language
+            const headers = rows[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+            
+            importedParsedRows = [];
+            let invalidCount = 0;
+            let validCount = 0;
+
+            const previewTbody = document.querySelector('#previewTable tbody');
+            previewTbody.innerHTML = '';
+
+            for (let i = 1; i < rows.length; i++) {
+                const cols = rows[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+                if (cols.length < headers.length) continue;
+
+                const name = cols[0];
+                const gender = cols[1];
+                const targetClass = cols[2];
+                const centreCode = cols[3];
+                const schoolCode = cols[4];
+                const guardName = cols[5];
+                const guardMobile = cols[6];
+                const lang = cols[7] || 'Hindi';
+
+                // Simple validation check
+                const isValid = name && gender && targetClass && centreCode && schoolCode;
+                
+                if (isValid) {
+                    validCount++;
+                    importedParsedRows.push({
+                        name, gender, targetClass, centreCode, schoolCode, guardName, guardMobile, lang
+                    });
+
+                    // Add to preview table
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${name}</td>
+                        <td>${gender}</td>
+                        <td>${targetClass}</td>
+                        <td>${centreCode}</td>
+                        <td>${schoolCode}</td>
+                    `;
+                    previewTbody.appendChild(tr);
+                } else {
+                    invalidCount++;
+                }
+            }
+
+            document.getElementById('previewCounts').textContent = `Total Rows: ${rows.length - 1} | Valid: ${validCount} | Invalid: ${invalidCount}`;
+            document.getElementById('importPreview').style.display = 'block';
+
+            const confirmBtn = document.getElementById('confirmImportBtn');
+            confirmBtn.disabled = validCount === 0;
+        }
+
+        async function executeBulkImport() {
+            if (!window.supabaseClient || importedParsedRows.length === 0) return;
+
+            try {
+                const btn = document.getElementById('confirmImportBtn');
+                btn.disabled = true;
+                btn.textContent = 'Importing...';
+
+                for (const row of importedParsedRows) {
+                    // 1. Resolve Centre ID from Code
+                    const matchingCentre = centres.find(c => c.centre_code === row.centreCode);
+                    if (!matchingCentre) continue;
+
+                    // 2. Resolve School ID from Code
+                    const matchingSchool = schools.find(s => s.school_code === row.schoolCode);
+                    const schoolIdVal = matchingSchool ? matchingSchool.id : null;
+
+                    const suffix = Math.floor(100000 + Math.random() * 900000);
+                    const studentIdCode = `GT-LIT-2026-${suffix}`;
+
+                    // Insert student
+                    const { data: student, error: insErr } = await window.supabaseClient
+                        .from('students')
+                        .insert({
+                            student_id: studentIdCode,
+                            name: row.name,
+                            gender: row.gender,
+                            class: row.targetClass,
+                            centre_id: matchingCentre.id,
+                            school_id: schoolIdVal,
+                            guardian_name: row.guardName,
+                            guardian_mobile: row.guardMobile,
+                            language: row.lang,
+                            status: 'active'
+                        })
+                        .select()
+                        .single();
+
+                    if (insErr) throw insErr;
+
+                    // Register to active Event
+                    const { data: eventPart, error: regErr } = await window.supabaseClient
+                        .from('event_participants')
+                        .insert({
+                            event_id: 'e9000000-0000-0000-0000-000000000001',
+                            student_id: student.id,
+                            registration_number: `REG-2026-${suffix}`,
+                            registration_status: 'APPROVED',
+                            eligibility_status: 'ELIGIBLE',
+                            current_stage_id: 'es900000-0001-0000-0000-000000000001'
+                        })
+                        .select()
+                        .single();
+
+                    if (regErr) throw regErr;
+
+                    // Stage 1 bind
+                    await window.supabaseClient
+                        .from('stage_participants')
+                        .insert({
+                            stage_id: 'es900000-0001-0000-0000-000000000001',
+                            participant_id: eventPart.id,
+                            qualification_status: 'PENDING',
+                            attendance: 'PRESENT'
+                        });
+                }
+
+                alert(`Successfully imported ${importedParsedRows.length} student records!`);
+                toggleImportCard();
+                document.getElementById('importPreview').style.display = 'none';
+                document.getElementById('csvFileInput').value = '';
+                await loadStudentsList();
+
+            } catch (err) {
+                console.error("Bulk import failed:", err);
+                alert("Import process interrupted: " + err.message);
+            } finally {
+                const btn = document.getElementById('confirmImportBtn');
+                btn.disabled = false;
+                btn.textContent = 'Execute Import';
+            }
+        }
+    </script>
+</body>
+</html>

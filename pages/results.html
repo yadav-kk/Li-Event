@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results & Rankings - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link active" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Results, Leaderboards & Advancement</h1>
+                    <p>Track student performance, rankings and promote qualified finalists.</p>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <!-- Action bar for running rules -->
+                <div class="card" style="margin-bottom: 24px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
+                            <label class="form-label" style="font-size: 0.75rem;">Selected Event Stage</label>
+                            <select class="form-control" id="stageSelect" style="padding: 8px 12px;"></select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; min-width: 180px;">
+                            <label class="form-label" style="font-size: 0.75rem;">Filter by Centre</label>
+                            <select class="form-control" id="centreFilter" style="padding: 8px 12px;">
+                                <option value="">All Centres</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;" data-allowed-roles="super_admin, prog_admin">
+                        <button class="btn btn-secondary" onclick="executeAdvancementRules()">Calculate Rank & Qualify</button>
+                        <button class="btn btn-primary" id="confirmFinalistsBtn" onclick="confirmAndPromoteFinalists()">Confirm & Promote to Next Stage</button>
+                    </div>
+                </div>
+
+                <!-- Leaderboard Grid -->
+                <div class="card">
+                    <h3 class="card-title">Scoreboard & Status</h3>
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="resultsTable">
+                            <thead>
+                                <tr id="resultsHeader">
+                                    <th>Rank</th>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Centre</th>
+                                    <!-- Dynamic test column headers go here -->
+                                    <th>Total Score</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Select a stage to view rankings.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Core Results Processing Module -->
+    <script>
+        let currentStageId = '';
+        let assessmentList = [];
+        let stageParticipants = [];
+        let centresList = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect();
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            document.getElementById('stageSelect').addEventListener('change', handleStageChange);
+            document.getElementById('centreFilter').addEventListener('change', renderLeaderboard);
+
+            await fetchConfigurationMetadata();
+        });
+
+        async function fetchConfigurationMetadata() {
+            if (!window.supabaseClient) return;
+
+            try {
+                // Fetch Centres dropdown filter
+                const { data: cData } = await window.supabaseClient.from('centres').select('*').eq('status', 'active');
+                centresList = cData || [];
+                
+                const filter = document.getElementById('centreFilter');
+                centresList.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.centre_name;
+                    filter.appendChild(opt);
+                });
+
+                // Fetch Stages mapped to default active event
+                const { data: stages, error: stErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('*, event_id!inner(name)')
+                    .eq('event_id.event_code', 'GT-LIT-2026')
+                    .order('sequence', { ascending: true });
+
+                if (stErr) throw stErr;
+
+                const stageSelect = document.getElementById('stageSelect');
+                stages.forEach(st => {
+                    const opt = document.createElement('option');
+                    opt.value = st.id;
+                    opt.textContent = `${st.name} (${st.event_id.name})`;
+                    stageSelect.appendChild(opt);
+                });
+
+                if (stages.length > 0) {
+                    stageSelect.value = stages[0].id;
+                    handleStageChange();
+                }
+
+            } catch (err) {
+                console.error("Error loading config metadata:", err);
+            }
+        }
+
+        async function handleStageChange() {
+            currentStageId = document.getElementById('stageSelect').value;
+            if (!currentStageId) return;
+
+            try {
+                // 1. Fetch assessments for this stage
+                const { data: assessments, error: assErr } = await window.supabaseClient
+                    .from('event_assessments')
+                    .select('*')
+                    .eq('stage_id', currentStageId)
+                    .order('sequence', { ascending: true });
+
+                if (assErr) throw assErr;
+                assessmentList = assessments;
+
+                // Re-draw dynamic table headers
+                const headerRow = document.getElementById('resultsHeader');
+                
+                // Clear any existing dynamic columns (between Centre and Total)
+                while (headerRow.children.length > 6) {
+                    headerRow.removeChild(headerRow.children[4]);
+                }
+
+                const totalCol = headerRow.querySelector('th:nth-last-child(2)');
+                assessmentList.forEach(a => {
+                    const th = document.createElement('th');
+                    th.textContent = a.name;
+                    headerRow.insertBefore(th, totalCol);
+                });
+
+                await fetchStageRankings();
+
+            } catch (err) {
+                console.error("Error toggling stages:", err);
+            }
+        }
+
+        async function fetchStageRankings() {
+            if (!window.supabaseClient || !currentStageId) return;
+
+            try {
+                // Query Stage Participants and outer student links
+                const { data: participants, error: spErr } = await window.supabaseClient
+                    .from('stage_participants')
+                    .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id, centres(centre_name)))')
+                    .eq('stage_id', currentStageId);
+
+                if (spErr) throw spErr;
+                stageParticipants = participants;
+
+                // Query all scores submitted for this stage
+                const assessIds = assessmentList.map(a => a.id);
+                
+                let scores = [];
+                if (assessIds.length > 0) {
+                    const { data: scData, error: scErr } = await window.supabaseClient
+                        .from('assessment_scores')
+                        .select('*')
+                        .in('assessment_id', assessIds);
+                    
+                    if (scErr) throw scErr;
+                    scores = scData || [];
+                }
+
+                // Map scores to participant records: participant_id -> { assess_id: total_score }
+                stageParticipants.forEach(sp => {
+                    sp.scores = {};
+                    sp.calculatedTotal = 0;
+                    
+                    const pScores = scores.filter(sc => sc.stage_participant_id === sp.id);
+                    pScores.forEach(sc => {
+                        sp.scores[sc.assessment_id] = sc.total_score;
+                        sp.calculatedTotal += parseFloat(sc.total_score) || 0;
+                    });
+                });
+
+                renderLeaderboard();
+
+            } catch (err) {
+                console.error("Error loading stage rankings:", err);
+            }
+        }
+
+        function renderLeaderboard() {
+            const selectedCentre = document.getElementById('centreFilter').value;
+            const tbody = document.querySelector('#resultsTable tbody');
+            tbody.innerHTML = '';
+
+            let filteredList = [...stageParticipants];
+            
+            if (selectedCentre) {
+                filteredList = filteredList.filter(sp => sp.participant_id.student_id.centre_id === selectedCentre);
+            }
+
+            // Client side sorting:
+            // Sort by: Rank if exists, else calculatedTotal desc.
+            // If rank is populated, use that first
+            filteredList.sort((a, b) => {
+                if (a.stage_1_rank && b.stage_1_rank) {
+                    return a.stage_1_rank - b.stage_1_rank;
+                }
+                return b.calculatedTotal - a.calculatedTotal;
+            });
+
+            if (filteredList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${6 + assessmentList.length}" style="text-align: center; color: var(--text-muted);">No student results available.</td></tr>`;
+                return;
+            }
+
+            filteredList.forEach((sp, idx) => {
+                const sInfo = sp.participant_id.student_id;
+                const tr = document.createElement('tr');
+                
+                const rankNum = sp.stage_1_rank || (idx + 1);
+
+                let html = `
+                    <td><strong># ${rankNum}</strong></td>
+                    <td>${sInfo.student_id}</td>
+                    <td><strong>${sInfo.name}</strong></td>
+                    <td>${sInfo.centres ? sInfo.centres.centre_name : 'N/A'}</td>
+                `;
+
+                // Add scores for each test
+                assessmentList.forEach(a => {
+                    const score = sp.scores[a.id] !== undefined ? sp.scores[a.id] : '—';
+                    html += `<td>${score}</td>`;
+                });
+
+                // Display Total and Badge Status
+                const badgeClass = sp.qualification_status.toLowerCase();
+
+                html += `
+                    <td><strong>${sp.stage_1_score || sp.calculatedTotal.toFixed(2)}</strong></td>
+                    <td><span class="badge badge-${badgeClass}">${sp.qualification_status}</span></td>
+                `;
+
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Run PostgreSQL Ranking & Advancement RPC (SRS Section 38/39)
+        async function executeAdvancementRules() {
+            if (!window.supabaseClient || !currentStageId) return;
+
+            try {
+                // Call public.calculate_stage_advancement(p_stage_id)
+                // In Supabase client, we use rpc.
+                const { data, error } = await window.supabaseClient.rpc('calculate_stage_advancement', {
+                    p_stage_id: currentStageId
+                });
+
+                if (error) throw error;
+
+                alert("Advancement rankings calculated successfully!");
+                await fetchStageRankings();
+
+            } catch (err) {
+                console.error("Rules execution failed:", err);
+                alert("Rank calculation failed: " + err.message);
+            }
+        }
+
+        // Confirm finalist lists and register them to next stage (SRS Section 40)
+        async function confirmAndPromoteFinalists() {
+            if (!window.supabaseClient || !currentStageId) return;
+
+            const conf = confirm("Do you want to confirm these finalists and promote them to Stage 2 (Championship)? This will lock selections for this stage.");
+            if (!conf) return;
+
+            try {
+                // 1. Lock qualification status to CONFIRMED for qualified students
+                const { error: updErr } = await window.supabaseClient
+                    .from('stage_participants')
+                    .update({ qualification_status: 'CONFIRMED' })
+                    .eq('stage_id', currentStageId)
+                    .eq('qualification_status', 'QUALIFIED');
+
+                if (updErr) throw updErr;
+
+                // 2. Resolve NEXT stage in event (sequence = 2)
+                const { data: currentStage } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('*')
+                    .eq('id', currentStageId)
+                    .single();
+
+                if (!currentStage) return;
+
+                const { data: nextStage, error: nsErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('*')
+                    .eq('event_id', currentStage.event_id)
+                    .eq('sequence', currentStage.sequence + 1)
+                    .single();
+
+                if (nsErr || !nextStage) {
+                    alert("Qualification confirmed. No subsequent stage configured for this event.");
+                    await fetchStageRankings();
+                    return;
+                }
+
+                // 3. Register confirmed finalists to Stage 2 stage_participants
+                const confirmedList = stageParticipants.filter(sp => sp.qualification_status === 'QUALIFIED' || sp.qualification_status === 'CONFIRMED');
+
+                for (const sp of confirmedList) {
+                    // Check if already registered to avoid constraint conflicts
+                    const { count } = await window.supabaseClient
+                        .from('stage_participants')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('stage_id', nextStage.id)
+                        .eq('participant_id', sp.participant_id.id);
+
+                    if (count === 0) {
+                        await window.supabaseClient
+                            .from('stage_participants')
+                            .insert({
+                                stage_id: nextStage.id,
+                                participant_id: sp.participant_id.id,
+                                qualification_status: 'PENDING',
+                                qualification_source: `Qualified from Stage 1 (Rank #${sp.stage_1_rank})`,
+                                attendance: 'PRESENT'
+                            });
+                    }
+                }
+
+                alert(`Finalists confirmed and promoted to: ${nextStage.name}!`);
+                await fetchStageRankings();
+
+            } catch (err) {
+                console.error("Promotion failed:", err);
+                alert("Promotion failed: " + err.message);
+            }
+        }
+    </script>
+</body>
+</html>

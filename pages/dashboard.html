@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Literacy India Event Portal</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link active">
+                    <span>Dashboard</span>
+                </a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management">
+                    <span>Events</span>
+                </a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator">
+                    <span>Students</span>
+                </a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management">
+                    <span>Centres</span>
+                </a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin">
+                    <span>Judge Panel</span>
+                </a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all">
+                    <span>Results & Rankings</span>
+                </a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge">
+                    <span>Evidence Upload</span>
+                </a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management">
+                    <span>Reports</span>
+                </a>
+                <a href="users.html" class="nav-link" data-allowed-roles="super_admin">
+                    <span>User Management</span>
+                </a>
+                <a href="audit-logs.html" class="nav-link" data-allowed-roles="super_admin">
+                    <span>Audit Logs</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-badge">
+                    <div class="user-avatar" id="avatarInitials">U</div>
+                    <div class="user-details">
+                        <span class="user-name user-name-display">Loading...</span>
+                        <span class="user-role user-role-display">User</span>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="menu-toggle" id="menuToggle" style="display: none;">
+                    <!-- Menu hamburger icon -->
+                    <span style="font-size: 1.5rem;">☰</span>
+                </div>
+                
+                <div class="header-title">
+                    <h1 id="dashboardTitle">Assessment Portal Dashboard</h1>
+                    <p class="user-centre-display">Head Office (HQ)</p>
+                </div>
+                
+                <div class="header-actions">
+                    <span class="badge badge-active user-role-display">Loading Role...</span>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <!-- Admin / Management Dashboard View -->
+                <div id="adminDashboardView" class="role-view" style="display: none;">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <span class="metric-label">Active Events</span>
+                            <span class="metric-value" id="activeEventsCount">0</span>
+                            <span class="metric-subtitle">Configuration-driven competitions</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Total Centres</span>
+                            <span class="metric-value" id="totalCentresCount">0</span>
+                            <span class="metric-subtitle">Enrolled operating locations</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Registered Students</span>
+                            <span class="metric-value" id="totalStudentsCount">0</span>
+                            <span class="metric-subtitle">Class V student database</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Assessments Finished</span>
+                            <span class="metric-value" id="completedAssessmentsCount">0</span>
+                            <span class="metric-subtitle">Scorecards locked/verified</span>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Live Events Monitor</h3>
+                            <a href="events.html" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 0.8rem;">View All</a>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="eventsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Event Code</th>
+                                        <th>Name</th>
+                                        <th>Academic Year</th>
+                                        <th>Class</th>
+                                        <th>Status</th>
+                                        <th>Start Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching events...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Centre In-Charge Dashboard View -->
+                <div id="centreDashboardView" class="role-view" style="display: none;">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <span class="metric-label">My Registered Students</span>
+                            <span class="metric-value" id="centreStudentsCount">0</span>
+                            <span class="metric-subtitle">Class V screening participants</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Attendance Confirmed</span>
+                            <span class="metric-value" id="attendanceCount">0%</span>
+                            <span class="metric-subtitle">Checked in for screening</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Evidence Uploaded</span>
+                            <span class="metric-value" id="evidenceCount">0</span>
+                            <span class="metric-subtitle">Sheets and pictures</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Qualified Stage 2</span>
+                            <span class="metric-value" id="qualifiedCount">0</span>
+                            <span class="metric-subtitle">Top 5 students qualified</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Centre Tasks Checklist</h3>
+                            </div>
+                            <ul style="list-style: none; display: flex; flex-direction: column; gap: 14px; padding: 6px 0;">
+                                <li style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: var(--success); font-weight: bold;">✓</span>
+                                    <span>Register all eligible Class V students</span>
+                                </li>
+                                <li style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: var(--success); font-weight: bold;">✓</span>
+                                    <span>Verify school types and guardian mobiles</span>
+                                </li>
+                                <li style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: var(--warning); font-weight: bold;">☐</span>
+                                    <span>Mark student attendance for spelling/reading/writing</span>
+                                </li>
+                                <li style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: var(--warning); font-weight: bold;">☐</span>
+                                    <span>Upload signed score sheets & group photographs</span>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Latest registered students</h3>
+                            </div>
+                            <div class="table-container" style="border: none; margin-bottom: 0;">
+                                <table class="data-table" id="centreStudentsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Student ID</th>
+                                            <th>Name</th>
+                                            <th>Gender</th>
+                                            <th>School</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Fetching students...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Judge Dashboard View -->
+                <div id="judgeDashboardView" class="role-view" style="display: none;">
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">My Assigned Assessments</h3>
+                        </div>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px;">
+                            Below are the assessments you are assigned to evaluate. Click the assessment to enter or edit marks.
+                        </p>
+                        <div class="table-container">
+                            <table class="data-table" id="judgeAssessmentsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Event / Stage</th>
+                                        <th>Assessment</th>
+                                        <th>Date</th>
+                                        <th>Max Marks</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching assignments...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer-note">
+                    Literacy India Event Management Portal. Reusable Assessment System. All rights reserved.
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Script Handling -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check session and redirect if missing
+            const isSessionValid = await window.Auth.checkSessionRedirect();
+            if (!isSessionValid) return;
+
+            const profile = window.Auth.getUserProfile();
+            if (!profile) return;
+
+            // Set Avatar Initials
+            if (profile.name) {
+                document.getElementById('avatarInitials').textContent = profile.name.charAt(0).toUpperCase();
+            }
+
+            // Bind logout button
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            // Toggle menu on mobile viewports
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.querySelector('.app-sidebar');
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+            });
+
+            // Distribute dashboard views based on roles
+            const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin']);
+            const isCentre = window.Auth.hasRole('centre_incharge');
+            const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
+
+            if (isSuper) {
+                document.getElementById('adminDashboardView').style.display = 'block';
+                await loadAdminDashboardData();
+            } else if (isCentre) {
+                document.getElementById('centreDashboardView').style.display = 'block';
+                document.getElementById('dashboardTitle').textContent = `Centre Panel: ${profile.centres ? profile.centres.centre_name : 'Assigned Centre'}`;
+                await loadCentreDashboardData(profile.centre_id);
+            } else if (isJudge) {
+                document.getElementById('judgeDashboardView').style.display = 'block';
+                document.getElementById('dashboardTitle').textContent = `Assessor Dashboard`;
+                await loadJudgeDashboardData();
+            } else {
+                // Management default read-only
+                document.getElementById('adminDashboardView').style.display = 'block';
+                await loadAdminDashboardData();
+            }
+        });
+
+        // 1. Loading Admin dashboard data from database
+        async function loadAdminDashboardData() {
+            if (!window.supabaseClient) return;
+
+            try {
+                // Fetch events
+                const { data: events, error: evErr } = await window.supabaseClient
+                    .from('events')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (evErr) throw evErr;
+
+                // Load to UI Table
+                const tbody = document.querySelector('#eventsTable tbody');
+                tbody.innerHTML = '';
+                
+                if (events && events.length > 0) {
+                    events.forEach(e => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${e.event_code}</strong></td>
+                            <td>${e.name}</td>
+                            <td>${e.academic_year}</td>
+                            <td>Class ${e.class}</td>
+                            <td><span class="badge badge-${e.status.toLowerCase()}">${e.status}</span></td>
+                            <td>${e.start_date || 'N/A'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    document.getElementById('activeEventsCount').textContent = events.filter(e => e.status !== 'ARCHIVED' && e.status !== 'CANCELLED').length;
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No events found.</td></tr>`;
+                }
+
+                // Fetch total centres
+                const { count: centresCount } = await window.supabaseClient
+                    .from('centres')
+                    .select('*', { count: 'exact', head: true });
+                document.getElementById('totalCentresCount').textContent = centresCount || 0;
+
+                // Fetch total students
+                const { count: studentsCount } = await window.supabaseClient
+                    .from('students')
+                    .select('*', { count: 'exact', head: true });
+                document.getElementById('totalStudentsCount').textContent = studentsCount || 0;
+
+                // Fetch total completed scorecards (verified/locked)
+                const { count: completedCount } = await window.supabaseClient
+                    .from('assessment_scores')
+                    .select('*', { count: 'exact', head: true })
+                    .in('status', ['VERIFIED', 'LOCKED']);
+                document.getElementById('completedAssessmentsCount').textContent = completedCount || 0;
+
+            } catch (err) {
+                console.error("Error loading admin stats:", err);
+            }
+        }
+
+        // 2. Loading Centre In-Charge stats
+        async function loadCentreDashboardData(centreId) {
+            if (!window.supabaseClient || !centreId) return;
+
+            try {
+                // Total students registered in this centre
+                const { data: students, error: studErr } = await window.supabaseClient
+                    .from('students')
+                    .select('*, schools(school_name)')
+                    .eq('centre_id', centreId)
+                    .order('created_at', { ascending: false });
+
+                if (studErr) throw studErr;
+
+                document.getElementById('centreStudentsCount').textContent = students.length;
+
+                // Load student preview table
+                const tbody = document.querySelector('#centreStudentsTable tbody');
+                tbody.innerHTML = '';
+
+                if (students && students.length > 0) {
+                    students.slice(0, 5).forEach(s => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${s.student_id}</td>
+                            <td>${s.name}</td>
+                            <td>${s.gender}</td>
+                            <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No students registered yet.</td></tr>`;
+                }
+
+                // Total evidence files uploaded by this centre
+                const { count: evCount } = await window.supabaseClient
+                    .from('evidence')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('centre_id', centreId);
+                document.getElementById('evidenceCount').textContent = evCount || 0;
+
+                // Total qualified students for Stage 2 from this centre
+                const { count: qCount } = await window.supabaseClient
+                    .from('stage_participants')
+                    .select('*, participant_id!inner(student_id!inner(centre_id))', { count: 'exact', head: true })
+                    .eq('participant_id.student_id.centre_id', centreId)
+                    .eq('qualification_status', 'QUALIFIED');
+                document.getElementById('qualifiedCount').textContent = qCount || 0;
+
+            } catch (err) {
+                console.error("Error loading centre stats:", err);
+            }
+        }
+
+        // 3. Loading Judge dashboard data
+        async function loadJudgeDashboardData() {
+            if (!window.supabaseClient) return;
+
+            try {
+                // Fetch assigned assessments
+                // Since Version 1 is scoring based, judges evaluate assessments.
+                // We'll query event_assessments details for the default active event stages.
+                const { data: assessments, error: asErr } = await window.supabaseClient
+                    .from('event_assessments')
+                    .select('*, stage_id!inner(name, event_id!inner(name))')
+                    .eq('status', 'ACTIVE')
+                    .order('sequence', { ascending: true });
+
+                if (asErr) throw asErr;
+
+                const tbody = document.querySelector('#judgeAssessmentsTable tbody');
+                tbody.innerHTML = '';
+
+                if (assessments && assessments.length > 0) {
+                    assessments.forEach(a => {
+                        const dateStr = a.start_datetime ? new Date(a.start_datetime).toLocaleDateString('en-IN') : 'N/A';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>
+                                <strong>${a.stage_id.event_id.name}</strong><br>
+                                <small style="color: var(--text-muted);">${a.stage_id.name}</small>
+                            </td>
+                            <td>${a.name}</td>
+                            <td>${dateStr}</td>
+                            <td>${a.max_marks}</td>
+                            <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
+                            <td>
+                                <a href="score-entry.html?assessment_id=${a.id}" class="btn btn-primary btn-sm" style="padding: 6px 12px; font-size: 0.8rem;">Enter Scores</a>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No active assessments assigned to you.</td></tr>`;
+                }
+            } catch (err) {
+                console.error("Error loading judge stats:", err);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events Registry - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Events & Competitions</h1>
+                    <p>Register and manage multi-stage assessment events.</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" data-allowed-roles="super_admin, prog_admin" onclick="window.location.href='event-builder.html'">+ Create Event</button>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <div class="card">
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="allEventsTable">
+                            <thead>
+                                <tr>
+                                    <th>Event Code</th>
+                                    <th>Name</th>
+                                    <th>Year</th>
+                                    <th>Class</th>
+                                    <th>Timeline</th>
+                                    <th>Status</th>
+                                    <th data-allowed-roles="super_admin, prog_admin">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Fetching events registry...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'academic_lead', 'coordinator', 'management']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            await loadEventsRegistry();
+        });
+
+        async function loadEventsRegistry() {
+            if (!window.supabaseClient) return;
+
+            try {
+                const { data: events, error: err } = await window.supabaseClient
+                    .from('events')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (err) throw err;
+
+                const tbody = document.querySelector('#allEventsTable tbody');
+                tbody.innerHTML = '';
+
+                const isAdmin = window.Auth.hasRole(['super_admin', 'prog_admin']);
+
+                if (events && events.length > 0) {
+                    events.forEach(e => {
+                        const tr = document.createElement('tr');
+                        const start = e.start_date || 'N/A';
+                        const end = e.end_date || 'N/A';
+                        
+                        let actionsHtml = '';
+                        if (isAdmin) {
+                            actionsHtml = `
+                                <td>
+                                    <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
+                                    <button class="btn btn-danger btn-sm" onclick="archiveEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Archive</button>
+                                </td>
+                            `;
+                        }
+
+                        tr.innerHTML = `
+                            <td><strong>${e.event_code}</strong></td>
+                            <td>${e.name}</td>
+                            <td>${e.academic_year}</td>
+                            <td>Class ${e.class}</td>
+                            <td><small>${start} to ${end}</small></td>
+                            <td><span class="badge badge-${e.status.toLowerCase()}">${e.status}</span></td>
+                            ${actionsHtml}
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No events found in register.</td></tr>`;
+                }
+
+            } catch (err) {
+                console.error("Error loading registry:", err);
+            }
+        }
+
+        // Clone Event Metadata (SRS Section 55)
+        async function cloneEvent(eventId) {
+            const conf = confirm("Do you want to clone this event structure (Stages, Assessments, and Criteria)? Student registrations and scores will NOT be copied.");
+            if (!conf) return;
+
+            try {
+                // 1. Fetch source event
+                const { data: srcEvent, error: evErr } = await window.supabaseClient
+                    .from('events')
+                    .select('*')
+                    .eq('id', eventId)
+                    .single();
+
+                if (evErr) throw evErr;
+
+                // Create cloned name & code
+                const nextYear = parseInt(srcEvent.academic_year) + 1 || 2027;
+                const newCode = `${srcEvent.event_code.split('-')[0]}-${srcEvent.event_code.split('-')[1] || 'LIT'}-${nextYear}`;
+                const newName = `${srcEvent.name.split('–')[0]} – Class V Literacy Challenge ${nextYear}`;
+
+                // 2. Insert new event
+                const { data: newEvent, error: insErr } = await window.supabaseClient
+                    .from('events')
+                    .insert({
+                        name: newName,
+                        event_code: newCode,
+                        academic_year: nextYear.toString(),
+                        class: srcEvent.class,
+                        description: srcEvent.description,
+                        objective: srcEvent.objective,
+                        status: 'DRAFT'
+                    })
+                    .select()
+                    .single();
+
+                if (insErr) throw insErr;
+
+                // 3. Fetch source stages
+                const { data: stages, error: stErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('*')
+                    .eq('event_id', eventId);
+
+                if (stErr) throw stErr;
+
+                for (const st of stages) {
+                    // Insert cloned stage
+                    const { data: newStage, error: insStErr } = await window.supabaseClient
+                        .from('event_stages')
+                        .insert({
+                            event_id: newEvent.id,
+                            name: st.name,
+                            description: st.description,
+                            sequence: st.sequence,
+                            venue: st.venue,
+                            status: 'DRAFT',
+                            advancement_rule_id: st.advancement_rule_id,
+                            advancement_rule_value: st.advancement_rule_value
+                        })
+                        .select()
+                        .single();
+
+                    if (insStErr) throw insStErr;
+
+                    // Fetch source assessments for this stage
+                    const { data: assessments, error: assErr } = await window.supabaseClient
+                        .from('event_assessments')
+                        .select('*')
+                        .eq('stage_id', st.id);
+
+                    if (assErr) throw assErr;
+
+                    for (const ass of assessments) {
+                        // Insert cloned assessment
+                        const { data: newAss, error: insAssErr } = await window.supabaseClient
+                            .from('event_assessments')
+                            .insert({
+                                stage_id: newStage.id,
+                                name: ass.name,
+                                description: ass.description,
+                                assessment_type: ass.assessment_type,
+                                sequence: ass.sequence,
+                                max_marks: ass.max_marks,
+                                status: 'DRAFT',
+                                required: ass.required,
+                                judge_assignment_mode: ass.judge_assignment_mode
+                            })
+                            .select()
+                            .single();
+
+                        if (insAssErr) throw insAssErr;
+
+                        // Fetch source criteria
+                        const { data: criteria, error: critErr } = await window.supabaseClient
+                            .from('assessment_criteria')
+                            .select('*')
+                            .eq('assessment_id', ass.id);
+
+                        if (critErr) throw critErr;
+
+                        for (const crit of criteria) {
+                            // Insert criteria
+                            const { error: insCritErr } = await window.supabaseClient
+                                .from('assessment_criteria')
+                                .insert({
+                                    assessment_id: newAss.id,
+                                    name: crit.name,
+                                    description: crit.description,
+                                    max_marks: crit.max_marks,
+                                    sequence: crit.sequence,
+                                    required: crit.required
+                                });
+
+                            if (insCritErr) throw insCritErr;
+                        }
+                    }
+                }
+
+                alert(`Event successfully cloned as ${newName}!`);
+                await loadEventsRegistry();
+
+            } catch (err) {
+                console.error("Clone failed:", err);
+                alert("Cloning transaction failed: " + err.message);
+            }
+        }
+
+        async function archiveEvent(eventId) {
+            const conf = confirm("Are you sure you want to archive this event?");
+            if (!conf) return;
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('events')
+                    .update({ status: 'ARCHIVED' })
+                    .eq('id', eventId);
+
+                if (error) throw error;
+                await loadEventsRegistry();
+            } catch (err) {
+                console.error("Archive failed:", err);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+/* Mobile Viewport Responsiveness Stylesheet */
+
+@media (max-width: 1024px) {
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 0px;
+    }
+
+    .app-sidebar {
+        transform: translateX(-100%);
+        width: 260px;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .app-sidebar.open {
+        transform: translateX(0);
+    }
+
+    .app-main {
+        margin-left: 0;
+    }
+
+    .app-header {
+        padding: 0 20px;
+    }
+    
+    /* Menu Toggle Button for mobile */
+    .menu-toggle {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bg-surface-elevated);
+        border: 1px solid var(--border-color);
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+    }
+
+    .content-body {
+        padding: 20px 16px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Table Scroll Wrapping */
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+        min-width: 600px;
+    }
+    
+    .wizard-steps {
+        overflow-x: auto;
+        padding-bottom: 8px;
+    }
+    
+    .wizard-step {
+        min-width: 100px;
+    }
+}

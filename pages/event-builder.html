@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Builder Wizard - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Create Reusable Event</h1>
+                    <p>Configure dynamic stages, assessments, criteria and advancement rules.</p>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <!-- Wizard Steps Header Indicator -->
+                <div class="wizard-steps">
+                    <div class="wizard-step active" id="stepIndicator1">
+                        <div class="step-num">1</div>
+                        <span class="step-label">Basic Info</span>
+                    </div>
+                    <div class="wizard-step" id="stepIndicator2">
+                        <div class="step-num">2</div>
+                        <span class="step-label">Stages</span>
+                    </div>
+                    <div class="wizard-step" id="stepIndicator3">
+                        <div class="step-num">3</div>
+                        <span class="step-label">Assessments</span>
+                    </div>
+                    <div class="wizard-step" id="stepIndicator4">
+                        <div class="step-num">4</div>
+                        <span class="step-label">Criteria</span>
+                    </div>
+                    <div class="wizard-step" id="stepIndicator5">
+                        <div class="step-num">5</div>
+                        <span class="step-label">Advancement</span>
+                    </div>
+                    <div class="wizard-step" id="stepIndicator6">
+                        <div class="step-num">6</div>
+                        <span class="step-label">Review & Publish</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Basic Information -->
+                <div class="card wizard-content-pane" id="stepPane1">
+                    <h3 class="card-title">Step 1: Event Basic Information</h3>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="eventName">Event Name</label>
+                            <input class="form-control" type="text" id="eventName" placeholder="GyanTantra se Saksharta - Class V Challenge 2026">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="eventCode">Event Code (Unique)</label>
+                            <input class="form-control" type="text" id="eventCode" placeholder="GT-LIT-2026">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="academicYear">Academic Year</label>
+                            <input class="form-control" type="text" id="academicYear" placeholder="2026">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="targetClass">Class</label>
+                            <input class="form-control" type="text" id="targetClass" placeholder="V">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="startDate">Start Date</label>
+                            <input class="form-control" type="date" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="endDate">End Date</label>
+                            <input class="form-control" type="date" id="endDate">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="regStart">Registration Start</label>
+                            <input class="form-control" type="date" id="regStart">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="regEnd">Registration End</label>
+                            <input class="form-control" type="date" id="regEnd">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="objective">Objective</label>
+                        <textarea class="form-control" id="objective" rows="2" placeholder="Assess student proficiency..."></textarea>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+                        <button class="btn btn-secondary" onclick="window.location.href='events.html'">Cancel</button>
+                        <button class="btn btn-primary" onclick="goToStep(2)">Next: Stages</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Stages Configuration -->
+                <div class="card wizard-content-pane" id="stepPane2" style="display: none;">
+                    <h3 class="card-title">Step 2: Stages Configuration</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Define the chronological stages (e.g. Stage 1: Centre screening, Stage 2: HQ finals).</p>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                    
+                    <div id="stagesList" style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Default Stage 1 -->
+                        <div class="card stage-item" style="background-color: var(--bg-surface-elevated); padding: 16px;">
+                            <h4 style="font-size: 0.95rem; margin-bottom: 8px;">Stage #1</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Stage Name</label>
+                                    <input class="form-control stage-name" type="text" value="Centre Level Screening">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Venue</label>
+                                    <input class="form-control stage-venue" type="text" value="Local Centres">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" onclick="addStageItem()" style="margin-top: 12px;">+ Add Another Stage</button>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                        <button class="btn btn-secondary" onclick="goToStep(1)">Back</button>
+                        <button class="btn btn-primary" onclick="goToStep(3)">Next: Assessments</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Assessments Configuration -->
+                <div class="card wizard-content-pane" id="stepPane3" style="display: none;">
+                    <h3 class="card-title">Step 3: Assessments per Stage</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Map assessments (e.g. Spelling, Reading) to each configured stage.</p>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                    
+                    <div id="assessmentsList" style="display: flex; flex-direction: column; gap: 24px;">
+                        <!-- Populated by JS based on steps configured in Step 2 -->
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                        <button class="btn btn-secondary" onclick="goToStep(2)">Back</button>
+                        <button class="btn btn-primary" onclick="goToStep(4)">Next: Criteria Setup</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Criteria Config -->
+                <div class="card wizard-content-pane" id="stepPane4" style="display: none;">
+                    <h3 class="card-title">Step 4: Assessment Criteria setup</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Set sub-marking parameters. Sum of criteria marks MUST equal assessment total marks.</p>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+
+                    <div id="criteriaList" style="display: flex; flex-direction: column; gap: 24px;">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                        <button class="btn btn-secondary" onclick="goToStep(3)">Back</button>
+                        <button class="btn btn-primary" onclick="goToStep(5)">Next: Advancement Rules</button>
+                    </div>
+                </div>
+
+                <!-- Step 5: Advancement Rules -->
+                <div class="card wizard-content-pane" id="stepPane5" style="display: none;">
+                    <h3 class="card-title">Step 5: Configure Stage Advancement</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Define how students advance from one stage to the next.</p>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+
+                    <div id="advancementList" style="display: flex; flex-direction: column; gap: 20px;">
+                        <!-- Populated dynamically for each stage except the final stage -->
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                        <button class="btn btn-secondary" onclick="goToStep(4)">Back</button>
+                        <button class="btn btn-primary" onclick="goToStep(6)">Next: Review & Finish</button>
+                    </div>
+                </div>
+
+                <!-- Step 6: Review & Publish -->
+                <div class="card wizard-content-pane" id="stepPane6" style="display: none;">
+                    <h3 class="card-title">Step 6: Review Configuration</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Verify everything before publishing. The configuration will lock after deadlines pass.</p>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+
+                    <div id="errorMessagePublish" style="display: none; padding: 12px; border-radius: var(--radius-sm); background-color: var(--danger-light); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.85rem; margin-bottom: 16px;"></div>
+
+                    <div id="reviewContent" style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Summary generated by JS -->
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px;">
+                        <button class="btn btn-secondary" onclick="goToStep(5)">Back</button>
+                        <button class="btn btn-primary" id="publishBtn" onclick="publishEvent()">Publish Event</button>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Wizard Core JS Logic -->
+    <script>
+        let currentStep = 1;
+        let eventConfig = {
+            basic: {},
+            stages: [],
+            assessments: {},
+            criteria: {},
+            advancement: {}
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+        });
+
+        function addStageItem() {
+            const container = document.getElementById('stagesList');
+            const seq = container.children.length + 1;
+            
+            const div = document.createElement('div');
+            div.className = 'card stage-item';
+            div.style.backgroundColor = 'var(--bg-surface-elevated)';
+            div.style.padding = '16px';
+            div.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h4 style="font-size: 0.95rem;">Stage #${seq}</h4>
+                    <button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove(); reindexStages();" style="padding: 4px 8px; font-size: 0.75rem;">Remove</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Stage Name</label>
+                        <input class="form-control stage-name" type="text" placeholder="e.g. Finals">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Venue</label>
+                        <input class="form-control stage-venue" type="text" placeholder="e.g. Head Office Auditorium">
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function reindexStages() {
+            const items = document.querySelectorAll('#stagesList .stage-item');
+            items.forEach((item, index) => {
+                item.querySelector('h4').textContent = `Stage #${index + 1}`;
+            });
+        }
+
+        function collectStepData(step) {
+            if (step === 1) {
+                eventConfig.basic = {
+                    name: document.getElementById('eventName').value.trim(),
+                    code: document.getElementById('eventCode').value.trim(),
+                    year: document.getElementById('academicYear').value.trim(),
+                    class: document.getElementById('targetClass').value.trim(),
+                    startDate: document.getElementById('startDate').value,
+                    endDate: document.getElementById('endDate').value,
+                    regStart: document.getElementById('regStart').value,
+                    regEnd: document.getElementById('regEnd').value,
+                    objective: document.getElementById('objective').value.trim()
+                };
+            } else if (step === 2) {
+                const stageElements = document.querySelectorAll('#stagesList .stage-item');
+                eventConfig.stages = [];
+                stageElements.forEach((el, index) => {
+                    eventConfig.stages.push({
+                        sequence: index + 1,
+                        name: el.querySelector('.stage-name').value.trim(),
+                        venue: el.querySelector('.stage-venue').value.trim()
+                    });
+                });
+            } else if (step === 3) {
+                // Collect Assessments
+                eventConfig.stages.forEach(st => {
+                    const containers = document.querySelectorAll(`.assessments-stage-${st.sequence}`);
+                    eventConfig.assessments[st.sequence] = [];
+                    containers.forEach((c, index) => {
+                        const name = c.querySelector('.assess-name').value.trim();
+                        const marks = parseFloat(c.querySelector('.assess-marks').value) || 0;
+                        if (name) {
+                            eventConfig.assessments[st.sequence].push({
+                                sequence: index + 1,
+                                name,
+                                max_marks: marks
+                            });
+                        }
+                    });
+                });
+            } else if (step === 4) {
+                // Collect Criteria
+                eventConfig.stages.forEach(st => {
+                    const stageAssessments = eventConfig.assessments[st.sequence] || [];
+                    stageAssessments.forEach(ass => {
+                        const key = `${st.sequence}-${ass.sequence}`;
+                        const containers = document.querySelectorAll(`.criteria-assess-${key}`);
+                        eventConfig.criteria[key] = [];
+                        containers.forEach((c, index) => {
+                            const name = c.querySelector('.crit-name').value.trim();
+                            const marks = parseFloat(c.querySelector('.crit-marks').value) || 0;
+                            if (name) {
+                                eventConfig.criteria[key].push({
+                                    sequence: index + 1,
+                                    name,
+                                    max_marks: marks
+                                });
+                            }
+                        });
+                    });
+                });
+            } else if (step === 5) {
+                // Collect Advancement
+                eventConfig.stages.forEach(st => {
+                    // Only collect for intermediate stages
+                    if (st.sequence < eventConfig.stages.length) {
+                        const ruleId = document.getElementById(`advRule-${st.sequence}`).value;
+                        const ruleVal = parseInt(document.getElementById(`advVal-${st.sequence}`).value) || null;
+                        eventConfig.advancement[st.sequence] = {
+                            rule: ruleId,
+                            value: ruleVal
+                        };
+                    }
+                });
+            }
+        }
+
+        function validateStep(step) {
+            if (step === 1) {
+                const b = eventConfig.basic;
+                if (!b.name || !b.code || !b.year || !b.class || !b.startDate || !b.endDate) {
+                    alert("Please fill in all mandatory event fields.");
+                    return false;
+                }
+            } else if (step === 2) {
+                if (eventConfig.stages.length === 0 || eventConfig.stages.some(s => !s.name)) {
+                    alert("Please specify a name for all stages.");
+                    return false;
+                }
+            } else if (step === 3) {
+                // Check if all stages have at least one assessment
+                for (let st of eventConfig.stages) {
+                    const list = eventConfig.assessments[st.sequence] || [];
+                    if (list.length === 0) {
+                        alert(`Please add at least one assessment for stage: ${st.name}`);
+                        return false;
+                    }
+                }
+            } else if (step === 4) {
+                // Validate criteria sum matches assessment max marks
+                for (let st of eventConfig.stages) {
+                    const list = eventConfig.assessments[st.sequence] || [];
+                    for (let ass of list) {
+                        const key = `${st.sequence}-${ass.sequence}`;
+                        const criteria = eventConfig.criteria[key] || [];
+                        const sum = criteria.reduce((acc, c) => acc + c.max_marks, 0);
+                        if (criteria.length > 0 && sum !== ass.max_marks) {
+                            alert(`Error: The sum of criteria marks (${sum}) for assessment "${ass.name}" must equal its maximum marks (${ass.max_marks}).`);
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function buildStepPanes(step) {
+            if (step === 3) {
+                // Build Assessment panel inputs dynamically based on Step 2
+                const container = document.getElementById('assessmentsList');
+                container.innerHTML = '';
+                
+                eventConfig.stages.forEach(st => {
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `
+                        <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            Assessments for: ${st.name}
+                        </h4>
+                        <div id="assessments-container-${st.sequence}" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                            <!-- Insert assessments -->
+                            <div class="form-row assessments-stage-${st.sequence}">
+                                <div class="form-group" style="flex: 2;">
+                                    <label class="form-label">Assessment Name</label>
+                                    <input class="form-control assess-name" type="text" placeholder="e.g. Spelling">
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Max Marks</label>
+                                    <input class="form-control assess-marks" type="number" placeholder="20">
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="addAssessmentRow(${st.sequence})" style="margin-top: 12px; align-self: flex-start;">+ Add Assessment</button>
+                    `;
+                    container.appendChild(div);
+                });
+            } else if (step === 4) {
+                // Build Criteria setup panel based on Step 3
+                const container = document.getElementById('criteriaList');
+                container.innerHTML = '';
+
+                eventConfig.stages.forEach(st => {
+                    const list = eventConfig.assessments[st.sequence] || [];
+                    list.forEach(ass => {
+                        const key = `${st.sequence}-${ass.sequence}`;
+                        const div = document.createElement('div');
+                        div.className = 'card';
+                        div.innerHTML = `
+                            <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                Criteria for: ${st.name} ➔ ${ass.name} (${ass.max_marks} Marks)
+                            </h4>
+                            <div id="criteria-container-${key}" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                                <div class="form-row criteria-assess-${key}">
+                                    <div class="form-group" style="flex: 2;">
+                                        <label class="form-label">Criteria Parameter</label>
+                                        <input class="form-control crit-name" type="text" placeholder="e.g. 10 Words">
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label class="form-label">Weightage Marks</label>
+                                        <input class="form-control crit-marks" type="number" placeholder="10">
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="addCriteriaRow('${key}')" style="margin-top: 12px; align-self: flex-start;">+ Add Criteria Row</button>
+                        `;
+                        container.appendChild(div);
+                    });
+                });
+            } else if (step === 5) {
+                // Build Advancement Setup
+                const container = document.getElementById('advancementList');
+                container.innerHTML = '';
+
+                eventConfig.stages.forEach((st, idx) => {
+                    // Final stage doesn't advance
+                    if (idx < eventConfig.stages.length - 1) {
+                        const div = document.createElement('div');
+                        div.className = 'card';
+                        div.innerHTML = `
+                            <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                Advance from: ${st.name} to ${eventConfig.stages[idx+1].name}
+                            </h4>
+                            <div class="form-row" style="margin-top: 12px;">
+                                <div class="form-group">
+                                    <label class="form-label">Advancement Rule</label>
+                                    <select class="form-control" id="advRule-${st.sequence}">
+                                        <option value="TOP_N_PER_CENTRE">Top N Students per Centre</option>
+                                        <option value="TOP_N_OVERALL">Top N Students Overall</option>
+                                        <option value="PERCENTAGE_THRESHOLD">Percentage Threshold (%)</option>
+                                        <option value="ALL_PARTICIPANTS">All Present Participants</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Rule Limit Value (N / %)</label>
+                                    <input class="form-control" type="number" id="advVal-${st.sequence}" placeholder="5">
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    }
+                });
+            } else if (step === 6) {
+                // Build Review Content
+                const container = document.getElementById('reviewContent');
+                container.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h4 style="font-size: 1rem; margin-bottom: 8px;">Event Details</h4>
+                            <p><strong>Name:</strong> ${eventConfig.basic.name}</p>
+                            <p><strong>Code:</strong> ${eventConfig.basic.code}</p>
+                            <p><strong>Class:</strong> ${eventConfig.basic.class}</p>
+                            <p><strong>Academic Year:</strong> ${eventConfig.basic.year}</p>
+                            <p><strong>Timeline:</strong> ${eventConfig.basic.startDate} to ${eventConfig.basic.endDate}</p>
+                        </div>
+                        <div>
+                            <h4 style="font-size: 1rem; margin-bottom: 8px;">Stages Map</h4>
+                            <ol style="padding-left: 20px;">
+                                ${eventConfig.stages.map(s => `<li>${s.name} (Venue: ${s.venue})</li>`).join('')}
+                            </ol>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function addAssessmentRow(stageSeq) {
+            const container = document.getElementById(`assessments-container-${stageSeq}`);
+            const div = document.createElement('div');
+            div.className = `form-row assessments-stage-${stageSeq}`;
+            div.innerHTML = `
+                <div class="form-group" style="flex: 2;">
+                    <input class="form-control assess-name" type="text" placeholder="e.g. Writing">
+                </div>
+                <div class="form-group" style="flex: 1; display: flex; gap: 8px;">
+                    <input class="form-control assess-marks" type="number" placeholder="20">
+                    <button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 12px;">✖</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function addCriteriaRow(key) {
+            const container = document.getElementById(`criteria-container-${key}`);
+            const div = document.createElement('div');
+            div.className = `form-row criteria-assess-${key}`;
+            div.innerHTML = `
+                <div class="form-group" style="flex: 2;">
+                    <input class="form-control crit-name" type="text" placeholder="e.g. Fluency">
+                </div>
+                <div class="form-group" style="flex: 1; display: flex; gap: 8px;">
+                    <input class="form-control crit-marks" type="number" placeholder="5">
+                    <button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 12px;">✖</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function goToStep(step) {
+            collectStepData(currentStep);
+            if (step > currentStep) {
+                const isValid = validateStep(currentStep);
+                if (!isValid) return;
+            }
+
+            // Hide all content panes
+            document.querySelectorAll('.wizard-content-pane').forEach(el => el.style.display = 'none');
+            // Show target pane
+            document.getElementById(`stepPane${step}`).style.display = 'block';
+
+            // Re-render steps headers
+            document.querySelectorAll('.wizard-step').forEach((el, idx) => {
+                if (idx < step) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+
+            // Build dynamic controls inside panes
+            buildStepPanes(step);
+
+            currentStep = step;
+        }
+
+        async function publishEvent() {
+            if (!window.supabaseClient) {
+                alert("Supabase client is not ready. Cannot write to database.");
+                return;
+            }
+
+            const errorDiv = document.getElementById('errorMessagePublish');
+            errorDiv.style.display = 'none';
+
+            try {
+                const publishBtn = document.getElementById('publishBtn');
+                publishBtn.disabled = true;
+                publishBtn.textContent = 'Publishing...';
+
+                // Insert Root Event
+                const { data: event, error: evErr } = await window.supabaseClient
+                    .from('events')
+                    .insert({
+                        name: eventConfig.basic.name,
+                        event_code: eventConfig.basic.code,
+                        academic_year: eventConfig.basic.year,
+                        class: eventConfig.basic.class,
+                        start_date: eventConfig.basic.startDate || null,
+                        end_date: eventConfig.basic.endDate || null,
+                        registration_start: eventConfig.basic.regStart || null,
+                        registration_end: eventConfig.basic.regEnd || null,
+                        objective: eventConfig.basic.objective || null,
+                        status: 'PLANNING'
+                    })
+                    .select()
+                    .single();
+
+                if (evErr) throw evErr;
+
+                // Insert Stages
+                for (const st of eventConfig.stages) {
+                    // Check if advancement rule exists for this stage sequence
+                    const advRule = eventConfig.advancement[st.sequence] || { rule: 'ALL_PARTICIPANTS', value: null };
+                    
+                    const { data: stage, error: stErr } = await window.supabaseClient
+                        .from('event_stages')
+                        .insert({
+                            event_id: event.id,
+                            name: st.name,
+                            sequence: st.sequence,
+                            venue: st.venue,
+                            status: st.sequence === 1 ? 'SCHEDULED' : 'DRAFT',
+                            advancement_rule_id: advRule.rule,
+                            advancement_rule_value: advRule.value
+                        })
+                        .select()
+                        .single();
+
+                    if (stErr) throw stErr;
+
+                    // Insert Assessments for this stage
+                    const assessments = eventConfig.assessments[st.sequence] || [];
+                    for (const ass of assessments) {
+                        const { data: assessment, error: assErr } = await window.supabaseClient
+                            .from('event_assessments')
+                            .insert({
+                                stage_id: stage.id,
+                                name: ass.name,
+                                sequence: ass.sequence,
+                                max_marks: ass.max_marks,
+                                status: 'DRAFT'
+                            })
+                            .select()
+                            .single();
+
+                        if (assErr) throw assErr;
+
+                        // Insert Criteria for this assessment
+                        const key = `${st.sequence}-${ass.sequence}`;
+                        const criteria = eventConfig.criteria[key] || [];
+                        for (const crit of criteria) {
+                            const { error: critErr } = await window.supabaseClient
+                                .from('assessment_criteria')
+                                .insert({
+                                    assessment_id: assessment.id,
+                                    name: crit.name,
+                                    max_marks: crit.max_marks,
+                                    sequence: crit.sequence
+                                });
+
+                            if (critErr) throw critErr;
+                        }
+                    }
+                }
+
+                alert("Event successfully created and published in database!");
+                window.location.href = 'events.html';
+
+            } catch (err) {
+                console.error("Error publishing event:", err);
+                errorDiv.textContent = err.message || "Database insert transaction failed.";
+                errorDiv.style.display = 'block';
+                
+                const publishBtn = document.getElementById('publishBtn');
+                publishBtn.disabled = false;
+                publishBtn.textContent = 'Publish Event';
+            }
+        }
+    </script>
+</body>
+</html>
