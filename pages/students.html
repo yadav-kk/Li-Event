@@ -391,7 +391,7 @@
                         registration_number: `REG-2026-${suffix}`,
                         registration_status: 'APPROVED',
                         eligibility_status: 'ELIGIBLE',
-                        current_stage_id: 'es900000-0001-0000-0000-000000000001' // Stage 1 Screening
+                        current_stage_id: 'e1900000-0001-0000-0000-000000000001' // Stage 1 Screening
                     })
                     .select()
                     .single();
@@ -402,7 +402,7 @@
                 const { error: spErr } = await window.supabaseClient
                     .from('stage_participants')
                     .insert({
-                        stage_id: 'es900000-0001-0000-0000-000000000001',
+                        stage_id: 'e1900000-0001-0000-0000-000000000001',
                         participant_id: eventPart.id,
                         qualification_status: 'PENDING',
                         attendance: 'PRESENT'
@@ -543,7 +543,7 @@
                             registration_number: `REG-2026-${suffix}`,
                             registration_status: 'APPROVED',
                             eligibility_status: 'ELIGIBLE',
-                            current_stage_id: 'es900000-0001-0000-0000-000000000001'
+                            current_stage_id: 'e1900000-0001-0000-0000-000000000001'
                         })
                         .select()
                         .single();
@@ -554,7 +554,7 @@
                     await window.supabaseClient
                         .from('stage_participants')
                         .insert({
-                            stage_id: 'es900000-0001-0000-0000-000000000001',
+                            stage_id: 'e1900000-0001-0000-0000-000000000001',
                             participant_id: eventPart.id,
                             qualification_status: 'PENDING',
                             attendance: 'PRESENT'
