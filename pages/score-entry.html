@@ -28,7 +28,7 @@
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
                 <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
-                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
                 <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
                 <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
                 <a href="judge-dashboard.html" class="nav-link active" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
@@ -78,8 +78,8 @@
                         <table class="data-table" id="scoreMatrixTable">
                             <thead>
                                 <tr id="matrixHeader">
-                                    <th>Student ID</th>
-                                    <th>Student Name</th>
+                                    <th>Participant ID</th>
+                                    <th>Participant Name</th>
                                     <!-- Dynamic criteria columns header goes here -->
                                     <th>Total Score</th>
                                     <th>Remarks</th>
@@ -219,7 +219,7 @@
             tbody.innerHTML = '';
 
             if (participants.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${4 + criteriaList.length}" style="text-align: center; color: var(--text-muted);">No student participants mapped to this stage for your centre.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${4 + criteriaList.length}" style="text-align: center; color: var(--text-muted);">No participants mapped to this stage for your centre.</td></tr>`;
                 return;
             }
 

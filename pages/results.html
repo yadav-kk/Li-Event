@@ -28,7 +28,7 @@
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
                 <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
-                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
                 <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
                 <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
                 <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
@@ -47,7 +47,7 @@
             <header class="app-header">
                 <div class="header-title">
                     <h1>Results, Leaderboards & Advancement</h1>
-                    <p>Track student performance, rankings and promote qualified finalists.</p>
+                    <p>Track participant performance, rankings and promote qualified finalists.</p>
                 </div>
             </header>
 
@@ -82,7 +82,7 @@
                             <thead>
                                 <tr id="resultsHeader">
                                     <th>Rank</th>
-                                    <th>Student ID</th>
+                                    <th>Participant ID</th>
                                     <th>Name</th>
                                     <th>Centre</th>
                                     <!-- Dynamic test column headers go here -->
@@ -270,7 +270,7 @@
             });
 
             if (filteredList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${6 + assessmentList.length}" style="text-align: center; color: var(--text-muted);">No student results available.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${6 + assessmentList.length}" style="text-align: center; color: var(--text-muted);">No participant results available.</td></tr>`;
                 return;
             }
 

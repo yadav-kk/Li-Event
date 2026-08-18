@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Directory - Literacy India</title>
+    <title>Participant Directory - Literacy India</title>
     <!-- Stylesheets -->
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/components.css">
@@ -28,7 +28,7 @@
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
                 <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
-                <a href="students.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="students.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
                 <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
                 <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
                 <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
@@ -46,12 +46,12 @@
         <main class="app-main">
             <header class="app-header">
                 <div class="header-title">
-                    <h1>Students Directory</h1>
-                    <p>Enroll and list Class V students across centres.</p>
+                    <h1>Participants Directory</h1>
+                    <p>Enroll and list event participants across centres.</p>
                 </div>
                 <div class="header-actions" data-allowed-roles="super_admin, prog_admin, centre_incharge">
                     <button class="btn btn-secondary" onclick="toggleImportCard()">Bulk Import CSV</button>
-                    <button class="btn btn-primary" onclick="openEnrollmentModal()">+ Register Student</button>
+                    <button class="btn btn-primary" onclick="openEnrollmentModal()">+ Register Participant</button>
                 </div>
             </header>
 
@@ -59,14 +59,14 @@
                 
                 <!-- CSV Bulk Import Pane -->
                 <div class="card" id="importPane" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
-                    <h3 class="card-title">Bulk Import Students from CSV</h3>
+                    <h3 class="card-title">Bulk Import Participants from CSV</h3>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
-                        <span>CSV columns: <code>Student Name</code>, <code>Gender</code>, <code>Class</code>, <code>Centre Code</code>, <code>School Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.</span>
+                        <span>CSV columns: <code>Participant Name</code>, <code>Gender</code>, <code>Class</code>, <code>Centre Code</code>, <code>School Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.</span>
                         <button class="btn btn-secondary btn-sm" onclick="downloadSampleCSV()" style="padding: 6px 12px; font-size: 0.75rem;">Download Sample CSV</button>
                     </p>
                     
                     <div class="form-group" style="margin-top: 12px;">
-                        <label class="form-label" for="csvEvent">Register Students to Event</label>
+                        <label class="form-label" for="csvEvent">Register Participants to Event</label>
                         <select class="form-control" id="csvEvent" required>
                             <option value="">-- Select Event --</option>
                         </select>
@@ -102,7 +102,7 @@
 
                 <!-- Registration Modal dialog (Inline absolute wrapper for simple SPA layouts) -->
                 <div class="card" id="enrollmentModal" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
-                    <h3 class="card-title">Enroll New Student</h3>
+                    <h3 class="card-title">Enroll New Participant</h3>
                     <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
                     
                     <form id="enrollStudentForm">
@@ -135,8 +135,8 @@
                                 <input class="form-control" type="date" id="studDOB" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="studClass">Class</label>
-                                <select class="form-control" id="studClass" required>
+                                <label class="form-label" for="studClass">Class (Optional)</label>
+                                <select class="form-control" id="studClass">
                                     <option value="">-- Select Class --</option>
                                 </select>
                             </div>
@@ -184,7 +184,7 @@
                 <!-- Directory Grid List -->
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 8px;">
-                        <h3 class="card-title">Active Student Roster</h3>
+                        <h3 class="card-title">Active Participant Roster</h3>
                         
                         <div style="display: flex; gap: 12px;">
                             <select class="form-control" id="filterCentre" style="width: 180px;">
@@ -197,7 +197,7 @@
                         <table class="data-table" id="studentsTable">
                             <thead>
                                 <tr>
-                                    <th>Student ID</th>
+                                    <th>Participant ID</th>
                                     <th>Name</th>
                                     <th>Gender</th>
                                     <th>Class</th>
@@ -210,7 +210,7 @@
                                   </tr>
                               </thead>
                               <tbody>
-                                  <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Fetching students list...</td></tr>
+                                  <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Fetching participants list...</td></tr>
                               </tbody>
                         </table>
                     </div>
@@ -411,7 +411,7 @@
                         tbody.appendChild(tr);
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No student records found.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No participant records found.</td></tr>`;
                 }
 
             } catch (err) {
@@ -428,7 +428,7 @@
 
         function openEnrollmentModal() {
             editStudentId = null;
-            document.querySelector('#enrollmentModal .card-title').textContent = 'Enroll New Student';
+            document.querySelector('#enrollmentModal .card-title').textContent = 'Enroll New Participant';
             document.querySelector('#enrollmentModal button[type="submit"]').textContent = 'Submit Registration';
             document.getElementById('enrollStudentForm').reset();
             document.getElementById('enrollmentModal').style.display = 'block';
@@ -445,7 +445,7 @@
             if (!s) return;
 
             editStudentId = studentId;
-            document.querySelector('#enrollmentModal .card-title').textContent = 'Edit Student Details';
+            document.querySelector('#enrollmentModal .card-title').textContent = 'Edit Participant Details';
             document.querySelector('#enrollmentModal button[type="submit"]').textContent = 'Save Updates';
 
             document.getElementById('studName').value = s.name || '';
@@ -488,7 +488,7 @@
         }
 
         async function deleteStudent(studentId, name) {
-            if (!confirm(`Are you sure you want to permanently delete student "${name}"? This will cascadingly wipe all their event registrations and grading scores.`)) {
+            if (!confirm(`Are you sure you want to permanently delete participant "${name}"? This will cascadingly wipe all their event registrations and grading scores.`)) {
                 return;
             }
 
@@ -500,10 +500,10 @@
 
                 if (error) throw error;
 
-                alert("Student successfully deleted.");
+                alert("Participant successfully deleted.");
                 await loadStudentsList();
             } catch (err) {
-                console.error("Failed to delete student:", err);
+                console.error("Failed to delete participant:", err);
                 alert("Delete failed: " + err.message);
             }
         }
@@ -521,7 +521,7 @@
             const name = document.getElementById('studName').value.trim();
             const gender = document.getElementById('studGender').value;
             const dob = document.getElementById('studDOB').value || null;
-            const targetClass = document.getElementById('studClass').value;
+            const targetClass = document.getElementById('studClass').value || '1';
             const centreId = document.getElementById('studCentre').value;
             const schoolId = document.getElementById('studSchool').value || null;
             const guardianName = document.getElementById('studGuardian').value.trim();
@@ -630,7 +630,7 @@
                         if (insSp) throw insSp;
                     }
 
-                    alert("Student details updated successfully!");
+                    alert("Participant details updated successfully!");
                 } else {
                     // Insert Student
                     const { data: student, error: insErr } = await window.supabaseClient
@@ -681,7 +681,7 @@
 
                     if (spErr) throw spErr;
 
-                    alert(`Student enrolled successfully! ID: ${studentIdCode}`);
+                    alert(`Participant enrolled successfully! ID: ${studentIdCode}`);
                 }
 
                 closeEnrollmentModal();
@@ -713,7 +713,7 @@
                 return;
             }
 
-            // Headers: Student Name, Gender, Class, Centre Code, School Code, Guardian Name, Guardian Mobile, Language
+            // Headers: Participant Name, Gender, Class, Centre Code, School Code, Guardian Name, Guardian Mobile, Language
             const headers = rows[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
             
             importedParsedRows = [];
@@ -729,7 +729,7 @@
 
                 const name = cols[0];
                 const gender = cols[1];
-                const targetClass = cols[2];
+                const targetClass = cols[2] || '1';
                 const centreCode = cols[3];
                 const schoolCode = cols[4];
                 const guardName = cols[5];
@@ -737,7 +737,7 @@
                 const lang = cols[7] || 'Hindi';
 
                 // Simple validation check
-                const isValid = name && gender && targetClass && centreCode && schoolCode;
+                const isValid = name && gender && centreCode && schoolCode;
                 
                 if (isValid) {
                     validCount++;
@@ -870,7 +870,7 @@
         function downloadSampleCSV() {
             // Build conforming CSV content template
             const csvContent = "data:text/csv;charset=utf-8," 
-                + "Student Name,Gender,Class,Centre Code,School Code,Guardian Name,Guardian Mobile,Language\n"
+                + "Participant Name,Gender,Class,Centre Code,School Code,Guardian Name,Guardian Mobile,Language\n"
                 + "Amit Kumar,M,V,DL-02,SCH-01,Rajesh Kumar,9876543210,Hindi\n"
                 + "Sunita Devi,F,V,HR-02,SCH-02,Sanjay Singh,9876543211,English\n";
                 

@@ -33,7 +33,7 @@
                     <span>Events</span>
                 </a>
                 <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator">
-                    <span>Students</span>
+                    <span>Participants</span>
                 </a>
                 <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management">
                     <span>Centres</span>
@@ -107,9 +107,9 @@
                             <span class="metric-subtitle">Enrolled operating locations</span>
                         </div>
                         <div class="metric-card">
-                            <span class="metric-label">Registered Students</span>
+                            <span class="metric-label">Registered Participants</span>
                             <span class="metric-value" id="totalStudentsCount">0</span>
-                            <span class="metric-subtitle">Class V student database</span>
+                            <span class="metric-subtitle">Class V participant database</span>
                         </div>
                         <div class="metric-card">
                             <span class="metric-label">Assessments Finished</span>
@@ -147,7 +147,7 @@
                 <div id="centreDashboardView" class="role-view" style="display: none;">
                     <div class="metrics-grid">
                         <div class="metric-card">
-                            <span class="metric-label">My Registered Students</span>
+                            <span class="metric-label">My Registered Participants</span>
                             <span class="metric-value" id="centreStudentsCount">0</span>
                             <span class="metric-subtitle">Class V screening participants</span>
                         </div>
@@ -164,27 +164,27 @@
                         <div class="metric-card">
                             <span class="metric-label">Qualified Stage 2</span>
                             <span class="metric-value" id="qualifiedCount">0</span>
-                            <span class="metric-subtitle">Top 5 students qualified</span>
+                            <span class="metric-subtitle">Top 5 participants qualified</span>
                         </div>
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 24px;">
                         <div class="card">
                             <div class="card-header">
-                                <h3 class="card-title">Latest registered students</h3>
+                                <h3 class="card-title">Latest registered participants</h3>
                             </div>
                             <div class="table-container" style="border: none; margin-bottom: 0;">
                                 <table class="data-table" id="centreStudentsTable">
                                     <thead>
                                         <tr>
-                                            <th>Student ID</th>
+                                            <th>Participant ID</th>
                                             <th>Name</th>
                                             <th>Gender</th>
                                             <th>School</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Fetching students...</td></tr>
+                                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Fetching participants...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -390,7 +390,7 @@
                         tbody.appendChild(tr);
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No students registered yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No participants registered yet.</td></tr>`;
                 }
 
                 document.getElementById('evidenceCount').textContent = evCount;
