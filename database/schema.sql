@@ -1,4 +1,4 @@
--- Literacy India Event & Assessment Management Portal Database Schema
+-- Literacy India Event & Assessment Management Portal Database Schema (Direct Custom Auth)
 
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
@@ -18,13 +18,13 @@ create table public.centres (
     updated_at timestamp with time zone default now() not null
 );
 
--- 2. Users table (linked to Supabase auth.users)
+-- 2. Users table (stores user metadata and password directly, bypassing auth.users)
 create table public.users (
-    id uuid primary key, -- references auth.users(id) on delete cascade
+    id uuid primary key default gen_random_uuid(),
     name text not null,
     email text unique not null,
+    password text not null, -- Plain text password for simplified mock portal login
     mobile text,
-    role text default 'management' check (role in ('super_admin', 'prog_admin', 'centre_incharge', 'judge', 'academic_lead', 'final_judge', 'coordinator', 'management')),
     centre_id uuid references public.centres(id) on delete set null,
     status text default 'active' check (status in ('active', 'inactive')),
     created_at timestamp with time zone default now() not null,
@@ -35,7 +35,14 @@ create table public.users (
 alter table public.centres add constraint fk_centres_incharge foreign key (centre_incharge_id) references public.users(id) on delete set null;
 alter table public.centres add constraint fk_centres_coordinator foreign key (coordinator_id) references public.users(id) on delete set null;
 
--- 3. Schools table
+-- 3. User Roles mapping table (restored for roles mapping)
+create table public.user_roles (
+    user_id uuid references public.users(id) on delete cascade not null,
+    role_id text not null check (role_id in ('super_admin', 'prog_admin', 'centre_incharge', 'judge', 'academic_lead', 'final_judge', 'coordinator', 'management')),
+    primary key (user_id, role_id)
+);
+
+-- 4. Schools table
 create table public.schools (
     id uuid primary key default gen_random_uuid(),
     school_name text not null,
@@ -48,7 +55,7 @@ create table public.schools (
     updated_at timestamp with time zone default now() not null
 );
 
--- 4. Batches table
+-- 5. Batches table
 create table public.batches (
     id uuid primary key default gen_random_uuid(),
     name text not null,
@@ -57,7 +64,7 @@ create table public.batches (
     created_at timestamp with time zone default now() not null
 );
 
--- 5. Students master table
+-- 6. Students master table
 create table public.students (
     id uuid primary key default gen_random_uuid(),
     student_id text unique not null, -- format GT-LIT-YYYY-XXXXXX
@@ -77,7 +84,7 @@ create table public.students (
     updated_at timestamp with time zone default now() not null
 );
 
--- 6. Events table
+-- 7. Events table
 create table public.events (
     id uuid primary key default gen_random_uuid(),
     name text not null,
@@ -98,7 +105,7 @@ create table public.events (
     updated_at timestamp with time zone default now() not null
 );
 
--- 7. Event Stages table
+-- 8. Event Stages table
 create table public.event_stages (
     id uuid primary key default gen_random_uuid(),
     event_id uuid references public.events(id) on delete cascade not null,
@@ -118,7 +125,7 @@ create table public.event_stages (
     unique (event_id, sequence)
 );
 
--- 8. Event Assessments table
+-- 9. Event Assessments table
 create table public.event_assessments (
     id uuid primary key default gen_random_uuid(),
     stage_id uuid references public.event_stages(id) on delete cascade not null,
@@ -138,7 +145,7 @@ create table public.event_assessments (
     unique (stage_id, sequence)
 );
 
--- 9. Assessment Criteria table
+-- 10. Assessment Criteria table
 create table public.assessment_criteria (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid references public.event_assessments(id) on delete cascade not null,
@@ -151,7 +158,7 @@ create table public.assessment_criteria (
     unique (assessment_id, name)
 );
 
--- 10. Event Participants table
+-- 11. Event Participants table
 create table public.event_participants (
     id uuid primary key default gen_random_uuid(),
     event_id uuid references public.events(id) on delete cascade not null,
@@ -168,7 +175,7 @@ create table public.event_participants (
     unique (event_id, student_id)
 );
 
--- 11. Stage Participants table
+-- 12. Stage Participants table
 create table public.stage_participants (
     id uuid primary key default gen_random_uuid(),
     stage_id uuid references public.event_stages(id) on delete cascade not null,
@@ -184,7 +191,7 @@ create table public.stage_participants (
     unique (stage_id, participant_id)
 );
 
--- 12. Judge Assignments mapping table
+-- 13. Judge Assignments mapping table
 create table public.assessment_assignments (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid references public.event_assessments(id) on delete cascade not null,
@@ -194,7 +201,7 @@ create table public.assessment_assignments (
     created_at timestamp with time zone default now() not null
 );
 
--- 13. Assessment Scores table
+-- 14. Assessment Scores table
 create table public.assessment_scores (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid references public.event_assessments(id) on delete cascade not null,
@@ -211,7 +218,7 @@ create table public.assessment_scores (
     unique (assessment_id, stage_participant_id, judge_id)
 );
 
--- 14. Criteria Scores (relational normalized subscores)
+-- 15. Criteria Scores (relational normalized subscores)
 create table public.criteria_scores (
     id uuid primary key default gen_random_uuid(),
     score_id uuid references public.assessment_scores(id) on delete cascade not null,
@@ -221,7 +228,7 @@ create table public.criteria_scores (
     unique (score_id, criteria_id)
 );
 
--- 15. Evidence table for attachments
+-- 16. Evidence table for attachments
 create table public.evidence (
     id uuid primary key default gen_random_uuid(),
     event_id uuid references public.events(id) on delete cascade not null,
@@ -236,7 +243,7 @@ create table public.evidence (
     created_at timestamp with time zone default now() not null
 );
 
--- 16. Audit logs for operations
+-- 17. Audit logs for operations
 create table public.audit_logs (
     id uuid primary key default gen_random_uuid(),
     user_id uuid references public.users(id) on delete set null,
@@ -249,7 +256,7 @@ create table public.audit_logs (
     created_at timestamp with time zone default now() not null
 );
 
--- 17. Version history for tracks
+-- 18. Version history for tracks
 create table public.version_history (
     id uuid primary key default gen_random_uuid(),
     entity_type text not null,

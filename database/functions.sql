@@ -9,30 +9,7 @@ begin
 end;
 $$ language plpgsql;
 
--- 2. New user profile generation trigger function (inserts directly to public.users table)
-create or replace function public.handle_new_user()
-returns trigger as $$
-declare
-    v_role text;
-begin
-    -- Assign default role based on metadata or fallback to 'management'
-    v_role := coalesce(new.raw_user_meta_data->>'role', 'management');
-    
-    insert into public.users (id, name, email, mobile, role, status)
-    values (
-        new.id,
-        coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-        new.email,
-        new.raw_user_meta_data->>'mobile',
-        v_role,
-        'active'
-    );
-    
-    return new;
-end;
-$$ language plpgsql security definer;
-
--- 3. Criteria score boundary checker trigger
+-- 2. Criteria score boundary checker trigger
 create or replace function public.validate_criteria_score_limit()
 returns trigger as $$
 declare
@@ -51,7 +28,7 @@ begin
 end;
 $$ language plpgsql;
 
--- 4. Automatically recalculate total score from criteria scores
+-- 3. Automatically recalculate total score from criteria scores
 create or replace function public.recalculate_score_total()
 returns trigger as $$
 declare
@@ -86,24 +63,17 @@ begin
 end;
 $$ language plpgsql;
 
--- 5. Audit Log trigger function to track table audits automatically
+-- 4. Audit Log trigger function to track table audits automatically
 create or replace function public.audit_table_action()
 returns trigger as $$
 declare
-    v_user_id uuid;
+    v_user_id uuid := null;
     v_action text;
     v_entity_type text;
     v_entity_id text;
     v_old jsonb := null;
     v_new jsonb := null;
 begin
-    -- Retrieve user identity from supabase jwt claim if present
-    begin
-        v_user_id := auth.uid();
-    exception when others then
-        v_user_id := null;
-    end;
-
     v_action := tg_op;
     v_entity_type := tg_table_name::text;
 
@@ -126,7 +96,7 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- 6. Advancement rule engine trigger
+-- 5. Advancement rule engine trigger
 create or replace function public.calculate_stage_advancement(p_stage_id uuid)
 returns json as $$
 declare
