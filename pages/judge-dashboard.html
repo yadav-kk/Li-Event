@@ -27,14 +27,14 @@
             
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
-                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
-                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
-                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management, project_director, ceo"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator, project_director, ceo"><span>Participants</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management, project_director, ceo"><span>Centres</span></a>
                 <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
-                <a href="judge-dashboard.html" class="nav-link active" data-allowed-roles="judge, final_judge, super_admin, prog_admin"><span>Judge Panel</span></a>
+                <a href="judge-dashboard.html" class="nav-link active" data-allowed-roles="judge, final_judge, super_admin, prog_admin, project_director, ceo"><span>Judge Panel</span></a>
                 <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
-                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
-                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, project_director, ceo"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management, project_director, ceo"><span>Reports</span></a>
             </nav>
             
             <div class="sidebar-footer">
@@ -81,7 +81,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin', 'prog_admin']);
+            const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin', 'prog_admin', 'project_director', 'ceo']);
             if (!isSessionValid) return;
 
             document.getElementById('logoutBtn').addEventListener('click', () => {

@@ -27,14 +27,14 @@
             
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
-                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
-                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
-                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management, project_director, ceo"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator, project_director, ceo"><span>Participants</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management, project_director, ceo"><span>Centres</span></a>
                 <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
-                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin, prog_admin"><span>Judge Panel</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin, prog_admin, project_director, ceo"><span>Judge Panel</span></a>
                 <a href="results.html" class="nav-link active" data-allowed-roles="all"><span>Results & Rankings</span></a>
-                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
-                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, project_director, ceo"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management, project_director, ceo"><span>Reports</span></a>
             </nav>
             
             <div class="sidebar-footer">
@@ -88,10 +88,11 @@
                                     <!-- Dynamic test column headers go here -->
                                     <th>Total Score</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Select a stage to view rankings.</td></tr>
+                                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Select a stage to view rankings.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -184,11 +185,11 @@
                 const headerRow = document.getElementById('resultsHeader');
                 
                 // Clear any existing dynamic columns (between Centre and Total)
-                while (headerRow.children.length > 6) {
+                while (headerRow.children.length > 7) {
                     headerRow.removeChild(headerRow.children[4]);
                 }
 
-                const totalCol = headerRow.querySelector('th:nth-last-child(2)');
+                const totalCol = headerRow.querySelector('th:nth-last-child(3)');
                 assessmentList.forEach(a => {
                     const th = document.createElement('th');
                     th.textContent = a.name;
@@ -270,7 +271,7 @@
             });
 
             if (filteredList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${6 + assessmentList.length}" style="text-align: center; color: var(--text-muted);">No participant results available.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${7 + assessmentList.length}" style="text-align: center; color: var(--text-muted);">No participant results available.</td></tr>`;
                 return;
             }
 
@@ -296,14 +297,42 @@
                 // Display Total and Badge Status
                 const badgeClass = sp.qualification_status.toLowerCase();
 
+                const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'project_director', 'ceo']);
+                let actionsHtml = '—';
+                if (isPDOrAdmin && sp.qualification_status !== 'DISQUALIFIED') {
+                    actionsHtml = `<button class="btn btn-danger btn-sm" onclick="disqualifyParticipant('${sp.id}', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Drop</button>`;
+                }
+
                 html += `
                     <td><strong>${sp.stage_1_score || sp.calculatedTotal.toFixed(2)}</strong></td>
                     <td><span class="badge badge-${badgeClass}">${sp.qualification_status}</span></td>
+                    <td>${actionsHtml}</td>
                 `;
 
                 tr.innerHTML = html;
                 tbody.appendChild(tr);
             });
+        }
+
+        async function disqualifyParticipant(spId, name) {
+            if (!confirm(`Are you sure you want to drop/disqualify participant "${name}" from this phase?`)) {
+                return;
+            }
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('stage_participants')
+                    .update({ qualification_status: 'DISQUALIFIED' })
+                    .eq('id', spId);
+
+                if (error) throw error;
+
+                alert('Participant has been disqualified from this phase.');
+                await fetchStageRankings();
+            } catch (err) {
+                console.error("Error disqualifying participant:", err);
+                alert("Error: " + err.message);
+            }
         }
 
         // Run PostgreSQL Ranking & Advancement RPC (SRS Section 38/39)

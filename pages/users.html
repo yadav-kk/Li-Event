@@ -27,14 +27,14 @@
             
             <nav class="sidebar-nav">
                 <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
-                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
-                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
-                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management, project_director, ceo"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator, project_director, ceo"><span>Participants</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management, project_director, ceo"><span>Centres</span></a>
                 <a href="users.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
-                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin, prog_admin"><span>Judge Panel</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin, prog_admin, project_director, ceo"><span>Judge Panel</span></a>
                 <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
-                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
-                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, project_director, ceo"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management, project_director, ceo"><span>Reports</span></a>
             </nav>
             
             <div class="sidebar-footer">
@@ -90,6 +90,8 @@
                                 <select id="usrRole" class="form-control" required>
                                     <option value="super_admin">Super Admin</option>
                                     <option value="prog_admin">Program Admin</option>
+                                    <option value="project_director">Project Director</option>
+                                    <option value="ceo">CEO</option>
                                     <option value="coordinator">Coordinator</option>
                                     <option value="centre_incharge">Centre Incharge</option>
                                     <option value="judge">Judge / Assessor</option>
@@ -243,9 +245,12 @@
                 const role = e.target.value;
                 const singleGroup = document.getElementById('centreSingleSelectGroup');
                 const multiGroup = document.getElementById('centreMultiSelectGroup');
-                if (role === 'coordinator') {
+                if (role === 'coordinator' || role === 'project_director') {
                     singleGroup.style.display = 'none';
                     multiGroup.style.display = 'block';
+                } else if (['super_admin', 'prog_admin', 'ceo', 'management'].includes(role)) {
+                    singleGroup.style.display = 'none';
+                    multiGroup.style.display = 'none';
                 } else {
                     singleGroup.style.display = 'block';
                     multiGroup.style.display = 'none';
@@ -441,9 +446,12 @@
             // Toggle single vs multi select visibility
             const singleGroup = document.getElementById('centreSingleSelectGroup');
             const multiGroup = document.getElementById('centreMultiSelectGroup');
-            if (roleVal === 'coordinator') {
+            if (roleVal === 'coordinator' || roleVal === 'project_director') {
                 singleGroup.style.display = 'none';
                 multiGroup.style.display = 'block';
+            } else if (['super_admin', 'prog_admin', 'ceo', 'management'].includes(roleVal)) {
+                singleGroup.style.display = 'none';
+                multiGroup.style.display = 'none';
             } else {
                 singleGroup.style.display = 'block';
                 multiGroup.style.display = 'none';
@@ -452,7 +460,7 @@
             // Populate checkboxes
             document.querySelectorAll('.usr-centre-cb').forEach(cb => cb.checked = false);
             const selectedNames = [];
-            if (roleVal === 'coordinator' && u.user_centres) {
+            if ((roleVal === 'coordinator' || roleVal === 'project_director') && u.user_centres) {
                 u.user_centres.forEach(uc => {
                     if (uc.centres) {
                         const cb = Array.from(document.querySelectorAll('.usr-centre-cb')).find(el => el.value === uc.centres.id);
@@ -529,8 +537,8 @@
                 alert("Centre Incharge must have exactly one centre assigned.");
                 return;
             }
-            if (role === 'coordinator' && selectedCentres.length === 0) {
-                alert("Coordinator must have at least one centre assigned.");
+            if ((role === 'coordinator' || role === 'project_director') && selectedCentres.length === 0) {
+                alert(`${role.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())} must have at least one centre assigned.`);
                 return;
             }
 
@@ -544,7 +552,7 @@
                             email,
                             password,
                             mobile,
-                            centre_id: role === 'coordinator' ? null : centreId
+                            centre_id: ['coordinator', 'project_director', 'ceo', 'super_admin', 'prog_admin'].includes(role) ? null : centreId
                         })
                         .eq('id', editUserId);
 
@@ -568,14 +576,14 @@
 
                     if (roleErr) throw roleErr;
 
-                    // Sync Coordinator centres in user_centres mapping table
+                    // Sync Coordinator/PD centres in user_centres mapping table
                     const { error: delUcErr } = await window.supabaseClient
                         .from('user_centres')
                         .delete()
                         .eq('user_id', editUserId);
                     if (delUcErr) throw delUcErr;
 
-                    if (role === 'coordinator') {
+                    if (role === 'coordinator' || role === 'project_director') {
                         for (const cId of selectedCentres) {
                             const { error: insUcErr } = await window.supabaseClient
                                 .from('user_centres')
@@ -597,7 +605,7 @@
                             email,
                             password,
                             mobile,
-                            centre_id: role === 'coordinator' ? null : centreId,
+                            centre_id: ['coordinator', 'project_director', 'ceo', 'super_admin', 'prog_admin'].includes(role) ? null : centreId,
                             status: 'active'
                         })
                         .select()
@@ -615,8 +623,8 @@
 
                     if (roleErr) throw roleErr;
 
-                    // Insert Coordinator centres in user_centres mapping table
-                    if (role === 'coordinator') {
+                    // Insert Coordinator/PD centres in user_centres mapping table
+                    if (role === 'coordinator' || role === 'project_director') {
                         for (const cId of selectedCentres) {
                             const { error: insUcErr } = await window.supabaseClient
                                 .from('user_centres')
