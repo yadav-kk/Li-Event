@@ -131,7 +131,7 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="studSchool">School</label>
-                                <select class="form-control" id="studSchool" required></select>
+                                <select class="form-control" id="studSchool"></select>
                             </div>
                         </div>
 
@@ -270,7 +270,7 @@
         function updateSchoolDropdown() {
             const selectedCentre = document.getElementById('studCentre').value;
             const studSchool = document.getElementById('studSchool');
-            studSchool.innerHTML = '';
+            studSchool.innerHTML = '<option value="">-- No School (Optional) --</option>';
 
             const filteredSchools = schools.filter(s => s.centre_id === selectedCentre);
             filteredSchools.forEach(s => {

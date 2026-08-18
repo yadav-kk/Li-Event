@@ -42,6 +42,13 @@ create table public.user_roles (
     primary key (user_id, role_id)
 );
 
+-- User Centres mapping table (allows a user to belong to multiple centres)
+create table public.user_centres (
+    user_id uuid references public.users(id) on delete cascade not null,
+    centre_id uuid references public.centres(id) on delete cascade not null,
+    primary key (user_id, centre_id)
+);
+
 -- 4. Schools table
 create table public.schools (
     id uuid primary key default gen_random_uuid(),

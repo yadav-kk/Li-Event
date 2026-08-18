@@ -189,11 +189,11 @@
                 window.Auth.signOut();
             });
 
-            // Populate forms & tables
-            await loadCentresDropdowns();
-            await loadAssessmentsDropdown();
-            await loadUsersList();
-            await loadAccessAssignments();
+            // Populate forms & tables independently to prevent single query blockings
+            loadCentresDropdowns().catch(err => console.error("Error loading centres:", err));
+            loadAssessmentsDropdown().catch(err => console.error("Error loading assessments:", err));
+            loadUsersList().catch(err => console.error("Error loading users:", err));
+            loadAccessAssignments().catch(err => console.error("Error loading access assignments:", err));
             window.Permissions.applyUIRules();
         });
 

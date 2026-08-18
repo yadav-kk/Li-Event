@@ -62,6 +62,13 @@ create table public.user_roles (
     primary key (user_id, role_id)
 );
 
+-- User Centres mapping table (allows a user to belong to multiple centres)
+create table public.user_centres (
+    user_id uuid references public.users(id) on delete cascade not null,
+    centre_id uuid references public.centres(id) on delete cascade not null,
+    primary key (user_id, centre_id)
+);
+
 -- Schools table
 create table public.schools (
     id uuid primary key default gen_random_uuid(),
@@ -547,6 +554,11 @@ insert into public.user_roles (user_id, role_id) values
 ('10000000-0000-0000-0000-000000000003', 'centre_incharge');
 
 update public.centres set centre_incharge_id = '10000000-0000-0000-0000-000000000003' where id = 'c1000000-0000-0000-0000-000000000002';
+
+-- 3.1. Seed User Centres mapping
+insert into public.user_centres (user_id, centre_id) values
+('10000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001'), -- Delhi Assessor to Delhi
+('10000000-0000-0000-0000-000000000003', 'c1000000-0000-0000-0000-000000000002'); -- Noida In-Charge to Noida
 
 -- 4. Create Schools
 insert into public.schools (id, school_name, school_code, centre_id, school_type, address, status) values
