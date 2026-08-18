@@ -8,18 +8,18 @@ insert into public.centres (id, centre_code, centre_name, district, state, addre
 
 -- 2. Create Users (Admin, Judge and Centre Incharge credentials stored directly in database)
 insert into public.users (id, name, email, password, mobile, centre_id, status) values
-('u1000000-0000-0000-0000-000000000001', 'System Administrator', 'admin@test.com', 'password123', '9876543200', null, 'active'),
-('u1000000-0000-0000-0000-000000000002', 'Delhi Assessor', 'judge@test.com', 'password123', '9876543201', 'c1000000-0000-0000-0000-000000000001', 'active'),
-('u1000000-0000-0000-0000-000000000003', 'Noida In-Charge', 'noida@test.com', 'password123', '9876543202', 'c1000000-0000-0000-0000-000000000002', 'active');
+('10000000-0000-0000-0000-000000000001', 'System Administrator', 'admin@test.com', 'password123', '9876543200', null, 'active'),
+('10000000-0000-0000-0000-000000000002', 'Delhi Assessor', 'judge@test.com', 'password123', '9876543201', 'c1000000-0000-0000-0000-000000000001', 'active'),
+('10000000-0000-0000-0000-000000000003', 'Noida In-Charge', 'noida@test.com', 'password123', '9876543202', 'c1000000-0000-0000-0000-000000000002', 'active');
 
 -- 3. Map User Roles
 insert into public.user_roles (user_id, role_id) values
-('u1000000-0000-0000-0000-000000000001', 'super_admin'),
-('u1000000-0000-0000-0000-000000000002', 'judge'),
-('u1000000-0000-0000-0000-000000000003', 'centre_incharge');
+('10000000-0000-0000-0000-000000000001', 'super_admin'),
+('10000000-0000-0000-0000-000000000002', 'judge'),
+('10000000-0000-0000-0000-000000000003', 'centre_incharge');
 
 -- Update centres to associate incharge accounts
-update public.centres set centre_incharge_id = 'u1000000-0000-0000-0000-000000000003' where id = 'c1000000-0000-0000-0000-000000000002';
+update public.centres set centre_incharge_id = '10000000-0000-0000-0000-000000000003' where id = 'c1000000-0000-0000-0000-000000000002';
 
 -- 4. Create Schools (using valid hex prefix "a1000000")
 insert into public.schools (id, school_name, school_code, centre_id, school_type, address, status) values
