@@ -187,10 +187,36 @@
             if (!window.supabaseClient) return;
 
             try {
-                const { data: centres, error: err } = await window.supabaseClient
+                const profile = window.Auth.getUserProfile();
+                const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
+                const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
+
+                let allowedCentreIds = [];
+                if (isPDOrCoord) {
+                    const { data: ucData } = await window.supabaseClient
+                        .from('user_centres')
+                        .select('centre_id')
+                        .eq('user_id', profile.id);
+                    allowedCentreIds = ucData ? ucData.map(uc => uc.centre_id) : [];
+                }
+
+                let query = window.supabaseClient
                     .from('centres')
                     .select('*')
                     .order('centre_code', { ascending: true });
+
+                if (isPDOrCoord) {
+                    if (allowedCentreIds.length > 0) {
+                        query = query.in('id', allowedCentreIds);
+                    } else {
+                        // Return empty if no centres mapped
+                        query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+                    }
+                } else if (profile.centre_id && !isSuper) {
+                    query = query.eq('id', profile.centre_id);
+                }
+
+                const { data: centres, error: err } = await query;
 
                 if (err) throw err;
                 loadedCentres = centres || [];
