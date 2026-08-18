@@ -49,41 +49,20 @@
                     <h1>User & Access Management</h1>
                     <p>Manage portal accounts, roles, and event grading permissions.</p>
                 </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+                </div>
             </header>
 
             <section class="content-body">
                 
-                <!-- Main user list and creation form -->
-                <div class="form-row" style="align-items: start; margin-bottom: 32px;">
-                    <!-- User list table -->
-                    <div class="card" style="flex: 2;">
-                        <div class="card-header">
-                            <span class="card-title">Portal User Registry</span>
-                        </div>
-                        <div class="table-container" style="border: none; margin-bottom: 0;">
-                            <table class="data-table" id="usersTable">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Role</th>
-                                        <th>Centre</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Fetching users...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Create User Form -->
-                    <div class="card" style="flex: 1;">
-                        <div class="card-header">
-                            <span class="card-title">Create New User</span>
-                        </div>
-                        <form id="createUserForm" onsubmit="createNewUser(event)">
+                <!-- Create User Modal dialog -->
+                <div class="card" id="userModal" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
+                    <h3 class="card-title">Create New User Account</h3>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                    
+                    <form id="createUserForm" onsubmit="createNewUser(event)">
+                        <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Full Name</label>
                                 <input type="text" id="usrName" class="form-control" required placeholder="e.g. Rahul Sen">
@@ -92,6 +71,9 @@
                                 <label class="form-label">Email Address</label>
                                 <input type="email" id="usrEmail" class="form-control" required placeholder="e.g. rahul@lit.org">
                             </div>
+                        </div>
+
+                        <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Password</label>
                                 <input type="password" id="usrPassword" class="form-control" required placeholder="Password...">
@@ -100,6 +82,9 @@
                                 <label class="form-label">Mobile</label>
                                 <input type="text" id="usrMobile" class="form-control" placeholder="10 digit number">
                             </div>
+                        </div>
+
+                        <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Role</label>
                                 <select id="usrRole" class="form-control" required>
@@ -116,8 +101,35 @@
                                     <option value="">No Centre (HQ / All)</option>
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px;">Create Account</button>
-                        </form>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+                            <button class="btn btn-secondary" type="button" onclick="closeUserModal()">Cancel</button>
+                            <button class="btn btn-primary" type="submit">Create Account</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Portal User Registry -->
+                <div class="card" style="margin-bottom: 32px;">
+                    <div class="card-header">
+                        <span class="card-title">Portal User Registry</span>
+                    </div>
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Centre</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Fetching users...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -292,6 +304,15 @@
             }
         }
 
+        function openUserModal() {
+            document.getElementById('userModal').style.display = 'block';
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').style.display = 'none';
+            document.getElementById('createUserForm').reset();
+        }
+
         // Add User Handler
         async function createNewUser(event) {
             event.preventDefault();
@@ -331,7 +352,7 @@
                 if (roleErr) throw roleErr;
 
                 alert('User account created successfully!');
-                document.getElementById('createUserForm').reset();
+                closeUserModal();
                 await loadUsersList();
 
             } catch (err) {
