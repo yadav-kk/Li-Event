@@ -539,7 +539,20 @@ alter table public.version_history disable row level security;
 insert into public.centres (id, centre_code, centre_name, district, state, address, status) values
 ('c1000000-0000-0000-0000-000000000001', 'DL-01', 'Delhi Main Centre', 'South West Delhi', 'Delhi', 'Palam Vihar, Delhi', 'active'),
 ('c1000000-0000-0000-0000-000000000002', 'UP-01', 'Noida Extension Centre', 'Gautam Buddha Nagar', 'Uttar Pradesh', 'Sector 62, Noida', 'active'),
-('c1000000-0000-0000-0000-000000000003', 'HR-01', 'Gurugram Sector 45 Centre', 'Gurugram', 'Haryana', 'Sector 45, Gurugram', 'active');
+('c1000000-0000-0000-0000-000000000003', 'HR-01', 'Gurugram Sector 45 Centre', 'Gurugram', 'Haryana', 'Sector 45, Gurugram', 'active'),
+('c1000000-0000-0000-0000-000000000004', 'DL-02', 'Chhwala Community Centre', 'Delhi', 'Delhi', 'Delhi', 'active'),
+('c1000000-0000-0000-0000-000000000005', 'UP-02', 'Kulshera Community Centre', 'Noida', 'UP', 'Noida ,UP', 'active'),
+('c1000000-0000-0000-0000-000000000006', 'HR-02', 'GPS Dhanisadhrana', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000007', 'HR-03', 'GPS Sadhrana', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000008', 'HR-04', 'GPS Garhi', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000009', 'HR-05', 'GPS Patli', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000010', 'HR-06', 'GPS Iqbalpur', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000011', 'HR-07', 'GPS Mubrikpur', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000012', 'UP-03', 'GPS Atta', 'Noida', 'UP', 'Noida ,UP', 'active'),
+('c1000000-0000-0000-0000-000000000013', 'UP-04', 'GPS Chhlera', 'Noida', 'UP', 'Noida ,UP', 'active'),
+('c1000000-0000-0000-0000-000000000014', 'HR-08', 'GPS Bhatti Khurd', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000015', 'HR-09', 'GPS Bhangrola Girls', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active'),
+('c1000000-0000-0000-0000-000000000016', 'HR-10', 'GPS Bhangrola Boys', 'Gurugram', 'Haryana', 'Gurugram,Haryana', 'active');
 
 -- 2. Create Users
 insert into public.users (id, name, email, password, mobile, centre_id, status) values
