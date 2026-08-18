@@ -371,7 +371,8 @@
                         <td>${escapeHTML(centreText)}</td>
                         <td><span class="badge badge-completed">${escapeHTML(u.status)}</span></td>
                         <td>
-                            <button class="btn btn-secondary btn-sm" onclick="editUser('${u.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
+                            <button class="btn btn-secondary btn-sm" onclick="editUser('${u.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}', '${u.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -473,6 +474,40 @@
             }
 
             document.getElementById('userModal').style.display = 'block';
+        }
+
+        async function deleteUser(userId, name) {
+            if (!confirm(`Are you sure you want to permanently delete user "${name}"?`)) {
+                return;
+            }
+
+            try {
+                // Delete user roles first
+                await window.supabaseClient
+                    .from('user_roles')
+                    .delete()
+                    .eq('user_id', userId);
+
+                // Delete user centre mappings
+                await window.supabaseClient
+                    .from('user_centres')
+                    .delete()
+                    .eq('user_id', userId);
+
+                // Delete primary user record
+                const { error } = await window.supabaseClient
+                    .from('users')
+                    .delete()
+                    .eq('id', userId);
+
+                if (error) throw error;
+
+                alert('User deleted successfully!');
+                await loadUsersList();
+            } catch (err) {
+                console.error("Error deleting user:", err);
+                alert("Error deleting user: " + err.message);
+            }
         }
 
         // Add / Edit User Handler

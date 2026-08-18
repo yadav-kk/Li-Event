@@ -203,7 +203,16 @@
                     return;
                 }
 
+                const isAdmin = window.Auth.hasRole(['super_admin', 'prog_admin']);
                 centres.forEach(centre => {
+                    let actionsHtml = `<button class="btn btn-secondary btn-sm" onclick="managePrograms('${centre.id}', '${centre.centre_name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Manage Programs</button>`;
+                    if (isAdmin) {
+                        actionsHtml += `
+                            <button class="btn btn-secondary btn-sm" onclick="editCentre('${centre.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteCentre('${centre.id}', '${centre.centre_name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                        `;
+                    }
+
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td><strong>${escapeHTML(centre.centre_code)}</strong></td>
@@ -212,9 +221,7 @@
                         <td>${escapeHTML(centre.state || '-')}</td>
                         <td>${escapeHTML(centre.address || '-')}</td>
                         <td><span class="badge badge-${centre.status.toLowerCase()}">${centre.status}</span></td>
-                        <td>
-                            <button class="btn btn-secondary btn-sm" onclick="managePrograms('${centre.id}', '${centre.centre_name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Manage Programs</button>
-                        </td>
+                        <td>${actionsHtml}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -225,9 +232,58 @@
             }
         }
 
+        let editCentreId = null;
+
         function toggleAddCentreModal() {
             const card = document.getElementById('addCentreCard');
-            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+            if (card.style.display === 'none' || card.style.display === '') {
+                editCentreId = null;
+                document.querySelector('#addCentreCard .card-title').textContent = 'Add New Centre';
+                document.querySelector('#addCentreCard button[type="submit"]').textContent = 'Save Centre';
+                document.getElementById('addCentreForm').reset();
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        }
+
+        async function editCentre(centreId) {
+            const centre = loadedCentres.find(c => c.id === centreId);
+            if (!centre) return;
+
+            editCentreId = centreId;
+            document.querySelector('#addCentreCard .card-title').textContent = 'Edit Centre Details';
+            document.querySelector('#addCentreCard button[type="submit"]').textContent = 'Save Updates';
+
+            document.getElementById('centreCode').value = centre.centre_code || '';
+            document.getElementById('centreName').value = centre.centre_name || '';
+            document.getElementById('centreDistrict').value = centre.district || '';
+            document.getElementById('centreState').value = centre.state || '';
+            document.getElementById('centreAddress').value = centre.address || '';
+
+            document.getElementById('addCentreCard').style.display = 'block';
+            document.getElementById('addCentreCard').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function deleteCentre(centreId, name) {
+            if (!confirm(`Are you sure you want to permanently delete centre "${name}"? This will cascadingly wipe all its associated programs, users, and participants.`)) {
+                return;
+            }
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('centres')
+                    .delete()
+                    .eq('id', centreId);
+
+                if (error) throw error;
+
+                alert('Centre deleted successfully!');
+                await loadCentresRegistry();
+            } catch (err) {
+                console.error("Error deleting centre:", err);
+                alert("Error deleting centre: " + err.message);
+            }
         }
 
         async function saveNewCentre(event) {
@@ -241,22 +297,41 @@
             const address = document.getElementById('centreAddress').value.trim();
 
             try {
-                const { error: insErr } = await window.supabaseClient
-                    .from('centres')
-                    .insert({
-                        centre_code: code,
-                        centre_name: name,
-                        district: district,
-                        state: state,
-                        address: address,
-                        status: 'active'
-                    });
+                if (editCentreId) {
+                    // Update
+                    const { error: updErr } = await window.supabaseClient
+                        .from('centres')
+                        .update({
+                            centre_code: code,
+                            centre_name: name,
+                            district: district,
+                            state: state,
+                            address: address
+                        })
+                        .eq('id', editCentreId);
 
-                if (insErr) throw insErr;
+                    if (updErr) throw updErr;
+                    alert('Centre details updated successfully!');
+                } else {
+                    // Insert
+                    const { error: insErr } = await window.supabaseClient
+                        .from('centres')
+                        .insert({
+                            centre_code: code,
+                            centre_name: name,
+                            district: district,
+                            state: state,
+                            address: address,
+                            status: 'active'
+                        });
 
-                alert('Centre created successfully!');
+                    if (insErr) throw insErr;
+                    alert('Centre created successfully!');
+                }
+
                 document.getElementById('addCentreForm').reset();
-                toggleAddCentreModal();
+                document.getElementById('addCentreCard').style.display = 'none';
+                editCentreId = null;
                 await loadCentresRegistry();
 
             } catch (err) {
