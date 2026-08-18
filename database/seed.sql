@@ -63,6 +63,12 @@ insert into public.students (id, student_id, name, gender, date_of_birth, class,
 insert into public.events (id, name, event_code, event_type, academic_year, class, description, objective, start_date, end_date, registration_start, registration_end, venue, status) values
 ('e9000000-0000-0000-0000-000000000001', 'GyanTantra se Saksharta – Class V Literacy Challenge 2026', 'GT-LIT-2026', 'Competition', '2026', 'V', 'World Literacy Day Literacy Challenge event for Class V students.', 'Assess student proficiency in reading, writing and spelling skills.', '2026-09-02', '2026-09-08', '2026-08-15', '2026-08-30', 'Centres & Head Office', 'IN_PROGRESS');
 
+-- 7.1. Map Event to Centres
+insert into public.event_centres (event_id, centre_id) values
+('e9000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001'), -- Delhi
+('e9000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000002'), -- Noida
+('e9000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000003'); -- Gurugram
+
 -- 8. Create Stages (using valid hex prefix "e1900000")
 insert into public.event_stages (id, event_id, name, description, sequence, start_datetime, end_datetime, configuration_deadline, venue, status, participant_rule, advancement_rule_id, advancement_rule_value) values
 -- Stage 1: Centre Level Screening

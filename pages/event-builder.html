@@ -30,6 +30,7 @@
                 <a href="events.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
                 <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
                 <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
                 <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
                 <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
                 <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
@@ -60,11 +61,11 @@
                     </div>
                     <div class="wizard-step" id="stepIndicator2">
                         <div class="step-num">2</div>
-                        <span class="step-label">Stages</span>
+                        <span class="step-label">Phases</span>
                     </div>
                     <div class="wizard-step" id="stepIndicator3">
                         <div class="step-num">3</div>
-                        <span class="step-label">Assessments</span>
+                        <span class="step-label">Stages</span>
                     </div>
                     <div class="wizard-step" id="stepIndicator4">
                         <div class="step-num">4</div>
@@ -134,25 +135,32 @@
                         <textarea class="form-control" id="objective" rows="2" placeholder="Assess student proficiency..."></textarea>
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label">Participating Centres</label>
+                        <div id="centresCheckboxGroup" style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); background-color: var(--bg-base);">
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Loading centres...</span>
+                        </div>
+                    </div>
+
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
                         <button class="btn btn-secondary" onclick="window.location.href='events.html'">Cancel</button>
-                        <button class="btn btn-primary" onclick="goToStep(2)">Next: Stages</button>
+                        <button class="btn btn-primary" onclick="goToStep(2)">Next: Phases</button>
                     </div>
                 </div>
 
-                <!-- Step 2: Stages Configuration -->
+                <!-- Step 2: Phases Configuration -->
                 <div class="card wizard-content-pane" id="stepPane2" style="display: none;">
-                    <h3 class="card-title">Step 2: Stages Configuration</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Define the chronological stages (e.g. Stage 1: Centre screening, Stage 2: HQ finals).</p>
+                    <h3 class="card-title">Step 2: Phases Configuration</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Define the chronological phases (e.g. Phase 1: Centre screening, Phase 2: HQ finals).</p>
                     <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
                     
                     <div id="stagesList" style="display: flex; flex-direction: column; gap: 16px;">
-                        <!-- Default Stage 1 -->
+                        <!-- Default Phase 1 -->
                         <div class="card stage-item" style="background-color: var(--bg-surface-elevated); padding: 16px;">
-                            <h4 style="font-size: 0.95rem; margin-bottom: 8px;">Stage #1</h4>
+                            <h4 style="font-size: 0.95rem; margin-bottom: 8px;">Phase #1</h4>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label class="form-label">Stage Name</label>
+                                    <label class="form-label">Phase Name</label>
                                     <input class="form-control stage-name" type="text" value="Centre Level Screening">
                                 </div>
                                 <div class="form-group">
@@ -163,18 +171,18 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-secondary" onclick="addStageItem()" style="margin-top: 12px;">+ Add Another Stage</button>
+                    <button class="btn btn-secondary" onclick="addStageItem()" style="margin-top: 12px;">+ Add Another Phase</button>
 
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
                         <button class="btn btn-secondary" onclick="goToStep(1)">Back</button>
-                        <button class="btn btn-primary" onclick="goToStep(3)">Next: Assessments</button>
+                        <button class="btn btn-primary" onclick="goToStep(3)">Next: Stages</button>
                     </div>
                 </div>
 
-                <!-- Step 3: Assessments Configuration -->
+                <!-- Step 3: Stages Configuration -->
                 <div class="card wizard-content-pane" id="stepPane3" style="display: none;">
-                    <h3 class="card-title">Step 3: Assessments per Stage</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Map assessments (e.g. Spelling, Reading) to each configured stage.</p>
+                    <h3 class="card-title">Step 3: Stages per Phase</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Map stages (e.g. Spelling, Reading) to each configured phase.</p>
                     <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
                     
                     <div id="assessmentsList" style="display: flex; flex-direction: column; gap: 24px;">
@@ -259,7 +267,47 @@
             document.getElementById('logoutBtn').addEventListener('click', () => {
                 window.Auth.signOut();
             });
+
+            await loadCentresCheckboxes();
         });
+
+        async function loadCentresCheckboxes() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: centres, error } = await window.supabaseClient
+                    .from('centres')
+                    .select('id, centre_name, centre_code')
+                    .eq('status', 'active')
+                    .order('centre_code');
+
+                if (error) throw error;
+
+                const group = document.getElementById('centresCheckboxGroup');
+                group.innerHTML = '';
+
+                if (!centres || centres.length === 0) {
+                    group.innerHTML = `<span style="color: var(--text-muted); font-size: 0.9rem;">No active centres found.</span>`;
+                    return;
+                }
+
+                centres.forEach(c => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '6px';
+                    label.style.fontSize = '0.9rem';
+                    label.style.fontWeight = '500';
+                    label.style.cursor = 'pointer';
+                    label.innerHTML = `
+                        <input type="checkbox" class="centre-cb" value="${c.id}" checked>
+                        <span>${c.centre_code} - ${c.centre_name}</span>
+                    `;
+                    group.appendChild(label);
+                });
+            } catch (err) {
+                console.error("Error loading centres checkboxes:", err);
+            }
+        }
 
         function addStageItem() {
             const container = document.getElementById('stagesList');
@@ -306,7 +354,8 @@
                     endDate: document.getElementById('endDate').value,
                     regStart: document.getElementById('regStart').value,
                     regEnd: document.getElementById('regEnd').value,
-                    objective: document.getElementById('objective').value.trim()
+                    objective: document.getElementById('objective').value.trim(),
+                    centres: Array.from(document.querySelectorAll('.centre-cb:checked')).map(el => el.value)
                 };
             } else if (step === 2) {
                 const stageElements = document.querySelectorAll('#stagesList .stage-item');
@@ -622,6 +671,19 @@
                     .single();
 
                 if (evErr) throw evErr;
+
+                // Insert Event Centres mapping
+                if (eventConfig.basic.centres && eventConfig.basic.centres.length > 0) {
+                    for (const centreId of eventConfig.basic.centres) {
+                        const { error: ecErr } = await window.supabaseClient
+                            .from('event_centres')
+                            .insert({
+                                event_id: event.id,
+                                centre_id: centreId
+                            });
+                        if (ecErr) throw ecErr;
+                    }
+                }
 
                 // Insert Stages
                 for (const st of eventConfig.stages) {

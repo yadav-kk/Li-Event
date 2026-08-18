@@ -105,6 +105,13 @@ create table public.events (
     updated_at timestamp with time zone default now() not null
 );
 
+-- 7.1. Event Centres mapping table
+create table public.event_centres (
+    event_id uuid references public.events(id) on delete cascade not null,
+    centre_id uuid references public.centres(id) on delete cascade not null,
+    primary key (event_id, centre_id)
+);
+
 -- 8. Event Stages table
 create table public.event_stages (
     id uuid primary key default gen_random_uuid(),

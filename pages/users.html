@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User & Access Management - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="users.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>User & Access Management</h1>
+                    <p>Manage portal accounts, roles, and event grading permissions.</p>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <!-- Main user list and creation form -->
+                <div class="form-row" style="align-items: start; margin-bottom: 32px;">
+                    <!-- User list table -->
+                    <div class="card" style="flex: 2;">
+                        <div class="card-header">
+                            <span class="card-title">Portal User Registry</span>
+                        </div>
+                        <div class="table-container" style="border: none; margin-bottom: 0;">
+                            <table class="data-table" id="usersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Centre</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Fetching users...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Create User Form -->
+                    <div class="card" style="flex: 1;">
+                        <div class="card-header">
+                            <span class="card-title">Create New User</span>
+                        </div>
+                        <form id="createUserForm" onsubmit="createNewUser(event)">
+                            <div class="form-group">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" id="usrName" class="form-control" required placeholder="e.g. Rahul Sen">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" id="usrEmail" class="form-control" required placeholder="e.g. rahul@lit.org">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Password</label>
+                                <input type="password" id="usrPassword" class="form-control" required placeholder="Password...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Mobile</label>
+                                <input type="text" id="usrMobile" class="form-control" placeholder="10 digit number">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Role</label>
+                                <select id="usrRole" class="form-control" required>
+                                    <option value="super_admin">Super Admin</option>
+                                    <option value="prog_admin">Program Admin</option>
+                                    <option value="centre_incharge">Centre Incharge</option>
+                                    <option value="judge">Judge / Assessor</option>
+                                    <option value="management">Management (Read-Only)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Associated Centre (Optional)</label>
+                                <select id="usrCentre" class="form-control">
+                                    <option value="">No Centre (HQ / All)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px;">Create Account</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Event Access Assignments panel -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Judge Event Access Control</span>
+                    </div>
+                    <div class="form-row" style="align-items: start;">
+                        <!-- Assignment Form -->
+                        <div style="flex: 1;">
+                            <form id="assignAccessForm" onsubmit="assignJudgeAccess(event)" style="display: flex; flex-direction: column; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Select Judge / Assessor</label>
+                                    <select id="assignUser" class="form-control" required>
+                                        <option value="">Choose User...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Select Event Assessment / Stage</label>
+                                    <select id="assignAssessment" class="form-control" required>
+                                        <option value="">Choose Stage...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Assigned Centre</label>
+                                    <select id="assignCentre" class="form-control" required>
+                                        <option value="">Choose Centre...</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%;">Grant Grading Access</button>
+                            </form>
+                        </div>
+
+                        <!-- Active Permissions Grid -->
+                        <div style="flex: 2;">
+                            <div class="table-container" style="border: none; margin-bottom: 0;">
+                                <table class="data-table" id="accessAssignmentsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Judge</th>
+                                            <th>Assessment Stage</th>
+                                            <th>Allowed Centre</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Fetching assignments...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <footer class="footer-note">
+                    Literacy India Event Management Portal. Reusable Assessment System. All rights reserved.
+                </footer>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            // Populate forms & tables
+            await loadCentresDropdowns();
+            await loadAssessmentsDropdown();
+            await loadUsersList();
+            await loadAccessAssignments();
+            window.Permissions.applyUIRules();
+        });
+
+        // Dropdowns Populator
+        async function loadCentresDropdowns() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: centres } = await window.supabaseClient
+                    .from('centres')
+                    .select('id, centre_name, centre_code')
+                    .order('centre_code');
+
+                const usrCentreSelect = document.getElementById('usrCentre');
+                const assignCentreSelect = document.getElementById('assignCentre');
+
+                centres.forEach(c => {
+                    const opt1 = document.createElement('option');
+                    opt1.value = c.id;
+                    opt1.textContent = `${c.centre_code} - ${c.centre_name}`;
+                    usrCentreSelect.appendChild(opt1);
+
+                    const opt2 = document.createElement('option');
+                    opt2.value = c.id;
+                    opt2.textContent = `${c.centre_code} - ${c.centre_name}`;
+                    assignCentreSelect.appendChild(opt2);
+                });
+            } catch (err) {
+                console.error("Error loading centres dropdowns:", err);
+            }
+        }
+
+        async function loadAssessmentsDropdown() {
+            if (!window.supabaseClient) return;
+            try {
+                // Fetch event assessments (stages)
+                const { data: assessments } = await window.supabaseClient
+                    .from('event_assessments')
+                    .select('id, name, stage_id, event_stages(name)');
+
+                const select = document.getElementById('assignAssessment');
+                assessments.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.textContent = `${a.event_stages ? a.event_stages.name : 'Stage 1'} ➔ ${a.name}`;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                console.error("Error loading assessments:", err);
+            }
+        }
+
+        // Users & Roles Loader
+        async function loadUsersList() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: users, error } = await window.supabaseClient
+                    .from('users')
+                    .select('*, centres(centre_name, centre_code)')
+                    .order('name');
+
+                if (error) throw error;
+
+                const tbody = document.querySelector('#usersTable tbody');
+                const assignUserSelect = document.getElementById('assignUser');
+                
+                tbody.innerHTML = '';
+                assignUserSelect.innerHTML = '<option value="">Choose User...</option>';
+
+                users.forEach(u => {
+                    // Populate Table
+                    const tr = document.createElement('tr');
+                    const centreText = u.centres ? `${u.centres.centre_code} - ${u.centres.centre_name}` : 'HQ / All';
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(u.name)}</strong></td>
+                        <td>${escapeHTML(u.email)}</td>
+                        <td><span class="badge badge-active">${escapeHTML(u.role)}</span></td>
+                        <td>${escapeHTML(centreText)}</td>
+                        <td><span class="badge badge-completed">${escapeHTML(u.status)}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    // Populate Judges only in Access dropdown
+                    if (['judge', 'centre_incharge', 'super_admin'].includes(u.role)) {
+                        const opt = document.createElement('option');
+                        opt.value = u.id;
+                        opt.textContent = `${u.name} (${u.role})`;
+                        assignUserSelect.appendChild(opt);
+                    }
+                });
+            } catch (err) {
+                console.error("Error loading users list:", err);
+            }
+        }
+
+        // Add User Handler
+        async function createNewUser(event) {
+            event.preventDefault();
+            if (!window.supabaseClient) return;
+
+            const name = document.getElementById('usrName').value.trim();
+            const email = document.getElementById('usrEmail').value.trim();
+            const password = document.getElementById('usrPassword').value;
+            const mobile = document.getElementById('usrMobile').value.trim();
+            const role = document.getElementById('usrRole').value;
+            const centreId = document.getElementById('usrCentre').value || null;
+
+            try {
+                const { data: usr, error: insErr } = await window.supabaseClient
+                    .from('users')
+                    .insert({
+                        name,
+                        email,
+                        password,
+                        mobile,
+                        centre_id: centreId,
+                        status: 'active'
+                    })
+                    .select()
+                    .single();
+
+                if (insErr) throw insErr;
+
+                // Create role mapping
+                const { error: roleErr } = await window.supabaseClient
+                    .from('user_roles')
+                    .insert({
+                        user_id: usr.id,
+                        role_id: role
+                    });
+
+                if (roleErr) throw roleErr;
+
+                alert('User account created successfully!');
+                document.getElementById('createUserForm').reset();
+                await loadUsersList();
+
+            } catch (err) {
+                console.error("Error creating user:", err);
+                alert("Error: " + err.message);
+            }
+        }
+
+        // Access Assignments Manager
+        async function loadAccessAssignments() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: assigns, error } = await window.supabaseClient
+                    .from('assessment_assignments')
+                    .select('*, users!judge_id(name, email), event_assessments(name, event_stages(name)), centres(centre_name, centre_code)');
+
+                if (error) throw error;
+
+                const tbody = document.querySelector('#accessAssignmentsTable tbody');
+                tbody.innerHTML = '';
+
+                if (!assigns || assigns.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No access assignments active.</td></tr>`;
+                    return;
+                }
+
+                assigns.forEach(a => {
+                    const judgeName = a.users ? a.users.name : 'Unknown Judge';
+                    const assName = a.event_assessments ? `${a.event_assessments.event_stages.name} ➔ ${a.event_assessments.name}` : 'Assessment';
+                    const centreText = a.centres ? `${a.centres.centre_code} - ${a.centres.centre_name}` : 'All';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(judgeName)}</strong></td>
+                        <td>${escapeHTML(assName)}</td>
+                        <td>${escapeHTML(centreText)}</td>
+                        <td>
+                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="revokeAccess('${a.id}')">Revoke</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading access assignments:", err);
+            }
+        }
+
+        async function assignJudgeAccess(event) {
+            event.preventDefault();
+            if (!window.supabaseClient) return;
+
+            const judgeId = document.getElementById('assignUser').value;
+            const assessmentId = document.getElementById('assignAssessment').value;
+            const centreId = document.getElementById('assignCentre').value;
+
+            try {
+                const { error: insErr } = await window.supabaseClient
+                    .from('assessment_assignments')
+                    .insert({
+                        judge_id: judgeId,
+                        assessment_id: assessmentId,
+                        centre_id: centreId
+                    });
+
+                if (insErr) throw insErr;
+
+                alert('Grading access permission granted successfully!');
+                document.getElementById('assignAccessForm').reset();
+                await loadAccessAssignments();
+
+            } catch (err) {
+                console.error("Error assigning access:", err);
+                alert("Error mapping access: " + err.message);
+            }
+        }
+
+        async function revokeAccess(id) {
+            if (!confirm('Are you sure you want to revoke this grading permission?')) return;
+            if (!window.supabaseClient) return;
+
+            try {
+                const { error: delErr } = await window.supabaseClient
+                    .from('assessment_assignments')
+                    .delete()
+                    .eq('id', id);
+
+                if (delErr) throw delErr;
+
+                alert('Permission revoked.');
+                await loadAccessAssignments();
+
+            } catch (error) {
+                console.error("Error revoking access:", error);
+                alert("Error deleting permission.");
+            }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
