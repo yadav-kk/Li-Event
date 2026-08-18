@@ -84,7 +84,6 @@
                                     <tr>
                                         <th>Name</th>
                                         <th>Gender</th>
-                                        <th>Class</th>
                                         <th>Centre</th>
                                         <th>School</th>
                                     </tr>
@@ -133,12 +132,6 @@
                             <div class="form-group">
                                 <label class="form-label" for="studDOB">Date of Birth</label>
                                 <input class="form-control" type="date" id="studDOB" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="studClass">Class (Optional)</label>
-                                <select class="form-control" id="studClass">
-                                    <option value="">-- Select Class --</option>
-                                </select>
                             </div>
                         </div>
 
@@ -200,7 +193,6 @@
                                     <th>Participant ID</th>
                                     <th>Name</th>
                                     <th>Gender</th>
-                                    <th>Class</th>
                                     <th>Event</th>
                                     <th>Centre</th>
                                     <th>School</th>
@@ -210,7 +202,7 @@
                                   </tr>
                               </thead>
                               <tbody>
-                                  <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Fetching participants list...</td></tr>
+                                  <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Fetching participants list...</td></tr>
                               </tbody>
                         </table>
                     </div>
@@ -241,26 +233,7 @@
             document.getElementById('filterCentre').addEventListener('change', loadStudentsList);
             document.getElementById('csvFileInput').addEventListener('change', handleCSVFileSelect);
 
-            document.getElementById('studEvent').addEventListener('change', () => {
-                const eventId = document.getElementById('studEvent').value;
-                const studClass = document.getElementById('studClass');
-                studClass.innerHTML = '<option value="">-- Select Class --</option>';
 
-                const selectedEvent = loadedEvents.find(e => e.id === eventId);
-                if (selectedEvent && selectedEvent.class) {
-                    const classes = selectedEvent.class.split(', ');
-                    classes.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c;
-                        opt.textContent = `Class ${c}`;
-                        studClass.appendChild(opt);
-                    });
-                    
-                    if (classes.length === 1) {
-                        studClass.value = classes[0];
-                    }
-                }
-            });
 
             await fetchCentresSchoolsData();
             await loadStudentsList();
@@ -400,7 +373,6 @@
                             <td><strong>${s.student_id}</strong></td>
                             <td>${s.name}</td>
                             <td>${s.gender}</td>
-                            <td>Class ${s.class}</td>
                             <td>${eventName}</td>
                             <td>${s.centres ? s.centres.centre_name : 'N/A'}</td>
                             <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
@@ -457,23 +429,6 @@
             const eventVal = ep && ep.events ? loadedEvents.find(e => e.name === ep.events.name)?.id : '';
             document.getElementById('studEvent').value = eventVal || '';
 
-            // Populate Class selector
-            const studClass = document.getElementById('studClass');
-            studClass.innerHTML = '<option value="">-- Select Class --</option>';
-            if (eventVal) {
-                const selectedEvent = loadedEvents.find(e => e.id === eventVal);
-                if (selectedEvent && selectedEvent.class) {
-                    const classes = selectedEvent.class.split(', ');
-                    classes.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c;
-                        opt.textContent = `Class ${c}`;
-                        studClass.appendChild(opt);
-                    });
-                }
-            }
-            studClass.value = s.class || '';
-
             document.getElementById('studCentre').value = s.centre_id || '';
             
             // Re-populate schools dropdown based on centre
@@ -521,7 +476,7 @@
             const name = document.getElementById('studName').value.trim();
             const gender = document.getElementById('studGender').value;
             const dob = document.getElementById('studDOB').value || null;
-            const targetClass = document.getElementById('studClass').value || '1';
+            const targetClass = '1';
             const centreId = document.getElementById('studCentre').value;
             const schoolId = document.getElementById('studSchool').value || null;
             const guardianName = document.getElementById('studGuardian').value.trim();
@@ -750,7 +705,6 @@
                     tr.innerHTML = `
                         <td>${name}</td>
                         <td>${gender}</td>
-                        <td>${targetClass}</td>
                         <td>${centreCode}</td>
                         <td>${schoolCode}</td>
                     `;
