@@ -292,8 +292,8 @@
                 const csvEvent = document.getElementById('csvEvent');
                 studEvent.innerHTML = '<option value="">-- Select Event --</option>';
                 csvEvent.innerHTML = '<option value="">-- Select Event --</option>';
-                if (eData && eData.length > 0) {
-                    eData.forEach(e => {
+                if (loadedEvents && loadedEvents.length > 0) {
+                    loadedEvents.forEach(e => {
                         const opt = document.createElement('option');
                         opt.value = e.id;
                         opt.textContent = `${e.name} (${e.event_code})`;
