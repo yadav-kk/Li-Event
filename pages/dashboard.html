@@ -212,6 +212,28 @@
                                     </tbody>
                                 </table>
                             </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Events Aligned with My Centre</h3>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="centreEventsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Event Code</th>
+                                        <th>Name</th>
+                                        <th>Academic Year</th>
+                                        <th>Class</th>
+                                        <th>Status</th>
+                                        <th>Start Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching events...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -410,6 +432,36 @@
                     .eq('participant_id.student_id.centre_id', centreId)
                     .eq('qualification_status', 'QUALIFIED');
                 document.getElementById('qualifiedCount').textContent = qCount || 0;
+
+                // Load aligned events
+                const { data: alignedEvents, error: aeErr } = await window.supabaseClient
+                    .from('event_centres')
+                    .select('events(*)')
+                    .eq('centre_id', centreId);
+
+                if (aeErr) throw aeErr;
+
+                const tbodyEvents = document.querySelector('#centreEventsTable tbody');
+                tbodyEvents.innerHTML = '';
+
+                if (alignedEvents && alignedEvents.length > 0) {
+                    alignedEvents.forEach(ec => {
+                        const e = ec.events;
+                        if (!e) return;
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${e.event_code}</strong></td>
+                            <td>${e.name}</td>
+                            <td>${e.academic_year}</td>
+                            <td>Class ${e.class}</td>
+                            <td><span class="badge badge-${e.status.toLowerCase()}">${e.status}</span></td>
+                            <td>${e.start_date || 'N/A'}</td>
+                        `;
+                        tbodyEvents.appendChild(tr);
+                    });
+                } else {
+                    tbodyEvents.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No events aligned with your centre.</td></tr>`;
+                }
 
             } catch (err) {
                 console.error("Error loading centre stats:", err);

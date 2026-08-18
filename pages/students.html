@@ -151,6 +151,13 @@
                             <input class="form-control" type="text" id="studLanguage" value="Hindi">
                         </div>
 
+                        <div class="form-group">
+                            <label class="form-label" for="studEvent">Event to Register Under</label>
+                            <select class="form-control" id="studEvent" required>
+                                <option value="">-- Select Event --</option>
+                            </select>
+                        </div>
+
                         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
                             <button class="btn btn-secondary" type="button" onclick="closeEnrollmentModal()">Cancel</button>
                             <button class="btn btn-primary" type="submit">Submit Registration</button>
@@ -258,6 +265,24 @@
                     filterCentre.disabled = true;
                 }
 
+                // Fetch events
+                const { data: eData } = await window.supabaseClient
+                    .from('events')
+                    .select('id, name, event_code')
+                    .neq('status', 'ARCHIVED')
+                    .order('created_at', { ascending: false });
+
+                const studEvent = document.getElementById('studEvent');
+                studEvent.innerHTML = '<option value="">-- Select Event --</option>';
+                if (eData && eData.length > 0) {
+                    eData.forEach(e => {
+                        const opt = document.createElement('option');
+                        opt.value = e.id;
+                        opt.textContent = `${e.name} (${e.event_code})`;
+                        studEvent.appendChild(opt);
+                    });
+                }
+
                 // Populate schools based on selected centre
                 updateSchoolDropdown();
                 studCentre.addEventListener('change', updateSchoolDropdown);
@@ -360,8 +385,20 @@
             const guardianName = document.getElementById('studGuardian').value.trim();
             const guardianMobile = document.getElementById('studMobile').value.trim();
             const language = document.getElementById('studLanguage').value.trim();
+            const eventId = document.getElementById('studEvent').value;
 
             try {
+                // Fetch the first phase (sequence = 1) of the selected event
+                const { data: firstStage, error: stageErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('id')
+                    .eq('event_id', eventId)
+                    .eq('sequence', 1)
+                    .single();
+
+                if (stageErr) throw stageErr;
+                const stageId = firstStage.id;
+
                 // Insert Student
                 const { data: student, error: insErr } = await window.supabaseClient
                     .from('students')
@@ -383,27 +420,27 @@
 
                 if (insErr) throw insErr;
 
-                // Also register them directly to the default seeded Active Event: GT-LIT-2026 (e9000000-0000-0000-0000-000000000001)
+                // Also register them directly to the selected Event
                 const { data: eventPart, error: regErr } = await window.supabaseClient
                     .from('event_participants')
                     .insert({
-                        event_id: 'e9000000-0000-0000-0000-000000000001',
+                        event_id: eventId,
                         student_id: student.id,
                         registration_number: `REG-2026-${suffix}`,
                         registration_status: 'APPROVED',
                         eligibility_status: 'ELIGIBLE',
-                        current_stage_id: 'e1900000-0001-0000-0000-000000000001' // Stage 1 Screening
+                        current_stage_id: stageId
                     })
                     .select()
                     .single();
 
                 if (regErr) throw regErr;
 
-                // Bind student to Stage 1 stage_participants
+                // Bind student to Phase 1 stage_participants
                 const { error: spErr } = await window.supabaseClient
                     .from('stage_participants')
                     .insert({
-                        stage_id: 'e1900000-0001-0000-0000-000000000001',
+                        stage_id: stageId,
                         participant_id: eventPart.id,
                         qualification_status: 'PENDING',
                         attendance: 'PRESENT'
