@@ -4,6 +4,33 @@ const Permissions = {
     // Hide/show elements on the page based on the current user's roles
     applyUIRules() {
         const profile = window.Auth.getUserProfile();
+        
+        // Dynamically inject mobile menu toggle button into app-header if missing
+        const header = document.querySelector('.app-header');
+        if (header && !document.getElementById('menuToggle')) {
+            const toggleDiv = document.createElement('div');
+            toggleDiv.className = 'menu-toggle';
+            toggleDiv.id = 'menuToggle';
+            toggleDiv.style.display = 'none';
+            toggleDiv.innerHTML = '<span style="font-size: 1.5rem;">☰</span>';
+            header.insertBefore(toggleDiv, header.firstChild);
+
+            // Bind click handler for mobile responsive drawer
+            const sidebar = document.querySelector('.app-sidebar');
+            toggleDiv.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (sidebar) sidebar.classList.toggle('open');
+            });
+
+            // Close sidebar when clicking on the main viewport area
+            const main = document.querySelector('.app-main');
+            if (main && sidebar) {
+                main.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                });
+            }
+        }
+
         if (!profile || !profile.roles) {
             // Unauthenticated: hide everything marked with roles
             document.querySelectorAll('[data-allowed-roles]').forEach(el => {
