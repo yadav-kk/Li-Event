@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centres Registry - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Centres Directory</h1>
+                    <p>Manage learning centres, assignments, and personnel roles.</p>
+                </div>
+                <div class="header-actions" data-allowed-roles="super_admin, prog_admin">
+                    <button class="btn btn-primary" onclick="toggleAddCentreModal()">+ Add New Centre</button>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <div class="card" id="addCentreCard" style="display: none; margin-bottom: 24px;">
+                    <div class="card-header">
+                        <span class="card-title">Add New Centre</span>
+                        <button class="btn btn-secondary" style="padding: 4px 8px;" onclick="toggleAddCentreModal()">Close</button>
+                    </div>
+                    <form id="addCentreForm" onsubmit="saveNewCentre(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Centre Code</label>
+                                <input type="text" id="centreCode" class="form-control" placeholder="e.g. DL-02" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Centre Name</label>
+                                <input type="text" id="centreName" class="form-control" placeholder="e.g. Gurugram Sec 50" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">District</label>
+                                <input type="text" id="centreDistrict" class="form-control" placeholder="e.g. Gurugram">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">State</label>
+                                <input type="text" id="centreState" class="form-control" placeholder="e.g. Haryana">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Address</label>
+                            <input type="text" id="centreAddress" class="form-control" placeholder="Full street address...">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 8px;">Save Centre</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="allCentresTable">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>District</th>
+                                    <th>State</th>
+                                    <th>Address</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching centres registry...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <footer class="footer-note">
+                    Literacy India Event Management Portal. Reusable Assessment System. All rights reserved.
+                </footer>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'coordinator', 'management']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            await loadCentresRegistry();
+            window.Permissions.applyUIRules();
+        });
+
+        async function loadCentresRegistry() {
+            if (!window.supabaseClient) return;
+
+            try {
+                const { data: centres, error: err } = await window.supabaseClient
+                    .from('centres')
+                    .select('*')
+                    .order('centre_code', { ascending: true });
+
+                if (err) throw err;
+
+                const tbody = document.querySelector('#allCentresTable tbody');
+                tbody.innerHTML = '';
+
+                if (!centres || centres.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No centres found.</td></tr>`;
+                    return;
+                }
+
+                centres.forEach(centre => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(centre.centre_code)}</strong></td>
+                        <td>${escapeHTML(centre.centre_name)}</td>
+                        <td>${escapeHTML(centre.district || '-')}</td>
+                        <td>${escapeHTML(centre.state || '-')}</td>
+                        <td>${escapeHTML(centre.address || '-')}</td>
+                        <td><span class="badge badge-${centre.status.toLowerCase()}">${centre.status}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (error) {
+                console.error("Error loading centres:", error);
+                alert("Error loading centres. Please check connection and permissions.");
+            }
+        }
+
+        function toggleAddCentreModal() {
+            const card = document.getElementById('addCentreCard');
+            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function saveNewCentre(event) {
+            event.preventDefault();
+            if (!window.supabaseClient) return;
+
+            const code = document.getElementById('centreCode').value.trim();
+            const name = document.getElementById('centreName').value.trim();
+            const district = document.getElementById('centreDistrict').value.trim();
+            const state = document.getElementById('centreState').value.trim();
+            const address = document.getElementById('centreAddress').value.trim();
+
+            try {
+                const { error: insErr } = await window.supabaseClient
+                    .from('centres')
+                    .insert({
+                        centre_code: code,
+                        centre_name: name,
+                        district: district,
+                        state: state,
+                        address: address,
+                        status: 'active'
+                    });
+
+                if (insErr) throw insErr;
+
+                alert('Centre created successfully!');
+                document.getElementById('addCentreForm').reset();
+                toggleAddCentreModal();
+                await loadCentresRegistry();
+
+            } catch (err) {
+                console.error("Error saving centre:", err);
+                alert("Error saving centre: " + err.message);
+            }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>

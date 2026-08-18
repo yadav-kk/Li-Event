@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidence Upload - Literacy India</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    
+    <!-- Supabase, Auth, and Permissions -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/supabase.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/permissions.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">LI</div>
+                <div class="logo-text">Literacy India</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+                <a href="events.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, academic_lead, coordinator, management"><span>Events</span></a>
+                <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Students</span></a>
+                <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
+                <a href="judge-dashboard.html" class="nav-link" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
+                <a href="evidence.html" class="nav-link active" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
+                <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="app-main">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Evidence & Uploads</h1>
+                    <p>Track student test sheets, evidence photos, and confirmation logs.</p>
+                </div>
+            </header>
+
+            <section class="content-body">
+                
+                <div class="card" id="uploadCard" data-allowed-roles="centre_incharge, super_admin" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <span class="card-title">Upload Verification Evidence</span>
+                    </div>
+                    <form id="uploadEvidenceForm" onsubmit="uploadEvidenceRecord(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Event</label>
+                                <select id="evidenceEvent" class="form-control" required>
+                                    <option value="">Select Event...</option>
+                                    <option value="e9000000-0000-0000-0000-000000000001">GyanTantra se Saksharta 2026</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Evidence Type</label>
+                                <select id="evidenceType" class="form-control" required>
+                                    <option value="Answer Sheet">Answer Sheet PDF</option>
+                                    <option value="Event Photo">Event Photography</option>
+                                    <option value="Consent Form">Parent Consent Form</option>
+                                    <option value="Other">Other Document</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">File Description / Name</label>
+                                <input type="text" id="fileName" class="form-control" placeholder="e.g. Noida Spelling Test Sheets.pdf" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Mock Document File Path / URL</label>
+                                <input type="text" id="fileUrl" class="form-control" placeholder="e.g. /evidence/noida_spelling_sheets.pdf" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 8px;">Submit Evidence Link</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="allEvidenceTable">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Type</th>
+                                    <th>File Name</th>
+                                    <th>Path</th>
+                                    <th>Verification Status</th>
+                                    <th data-allowed-roles="super_admin, prog_admin">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching evidence...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <footer class="footer-note">
+                    Literacy India Event Management Portal. Reusable Assessment System. All rights reserved.
+                </footer>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'centre_incharge']);
+            if (!isSessionValid) return;
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.Auth.signOut();
+            });
+
+            await loadEvidenceRegistry();
+            window.Permissions.applyUIRules();
+        });
+
+        async function loadEvidenceRegistry() {
+            if (!window.supabaseClient) return;
+
+            try {
+                const { data: evidence, error: err } = await window.supabaseClient
+                    .from('evidence')
+                    .select('*, events(name)');
+
+                if (err) throw err;
+
+                const tbody = document.querySelector('#allEvidenceTable tbody');
+                tbody.innerHTML = '';
+
+                if (!evidence || evidence.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No evidence uploaded yet.</td></tr>`;
+                    return;
+                }
+
+                evidence.forEach(item => {
+                    const tr = document.createElement('tr');
+                    
+                    let actionHtml = '';
+                    const profile = window.Auth.getUserProfile();
+                    const isAdm = profile && ['super_admin', 'prog_admin'].includes(profile.role);
+                    
+                    if (isAdm) {
+                        actionHtml = `
+                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="verifyEvidence('${item.id}', 'VERIFIED')">Verify</button>
+                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="verifyEvidence('${item.id}', 'REJECTED')">Reject</button>
+                        `;
+                    }
+
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(item.events ? item.events.name : 'Saksharta Challenge')}</strong></td>
+                        <td>${escapeHTML(item.evidence_type)}</td>
+                        <td>${escapeHTML(item.file_name)}</td>
+                        <td><a href="#" style="color: var(--primary); text-decoration: underline;" onclick="alert('Viewing: ${escapeHTML(item.storage_path)}')">${escapeHTML(item.storage_path)}</a></td>
+                        <td><span class="badge badge-${item.verification_status.toLowerCase()}">${item.verification_status}</span></td>
+                        ${isAdm ? `<td>${actionHtml}</td>` : ''}
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (error) {
+                console.error("Error loading evidence:", error);
+                alert("Error loading evidence logs.");
+            }
+        }
+
+        async function uploadEvidenceRecord(event) {
+            event.preventDefault();
+            if (!window.supabaseClient) return;
+
+            const profile = window.Auth.getUserProfile();
+            const eventId = document.getElementById('evidenceEvent').value;
+            const type = document.getElementById('evidenceType').value;
+            const name = document.getElementById('fileName').value.trim();
+            const url = document.getElementById('fileUrl').value.trim();
+
+            try {
+                const { error: insErr } = await window.supabaseClient
+                    .from('evidence')
+                    .insert({
+                        event_id: eventId,
+                        evidence_type: type,
+                        file_name: name,
+                        storage_path: url,
+                        uploaded_by: profile.id,
+                        centre_id: profile.centre_id,
+                        verification_status: 'PENDING'
+                    });
+
+                if (insErr) throw insErr;
+
+                alert('Evidence submitted for validation!');
+                document.getElementById('uploadEvidenceForm').reset();
+                await loadEvidenceRegistry();
+
+            } catch (err) {
+                console.error("Error uploading evidence:", err);
+                alert("Error saving record: " + err.message);
+            }
+        }
+
+        async function verifyEvidence(id, status) {
+            if (!window.supabaseClient) return;
+
+            try {
+                const { error: updErr } = await window.supabaseClient
+                    .from('evidence')
+                    .update({ verification_status: status })
+                    .eq('id', id);
+
+                if (updErr) throw updErr;
+
+                alert(`Evidence status updated to ${status}`);
+                await loadEvidenceRegistry();
+
+            } catch (error) {
+                console.error("Error updating status:", error);
+                alert("Error modifying status.");
+            }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
