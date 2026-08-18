@@ -102,9 +102,44 @@
                             <label class="form-label" for="academicYear">Academic Year</label>
                             <input class="form-control" type="text" id="academicYear" placeholder="2026">
                         </div>
-                        <div class="form-group">
-                            <label class="form-label" for="targetClass">Class</label>
-                            <input class="form-control" type="text" id="targetClass" placeholder="V">
+                        <div class="form-group" style="position: relative;">
+                            <label class="form-label">Class</label>
+                            <div class="custom-multiselect" id="classSelectDropdown" style="cursor: pointer; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-sm); background-color: var(--bg-surface); display: flex; justify-content: space-between; align-items: center; min-height: 42px;">
+                                <span id="classSelectPlaceholder" style="color: var(--text-secondary); font-size: 0.95rem;">Select Classes...</span>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">▼</span>
+                            </div>
+                            <div id="classOptionsList" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100; background-color: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="I"> <span>Class I</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="II"> <span>Class II</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="III"> <span>Class III</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="IV"> <span>Class IV</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="V"> <span>Class V</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="VI"> <span>Class VI</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="VII"> <span>Class VII</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="VIII"> <span>Class VIII</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="IX"> <span>Class IX</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">
+                                    <input type="checkbox" class="class-cb" value="X"> <span>Class X</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -269,6 +304,40 @@
             });
 
             await loadCentresCheckboxes();
+
+            // Custom multi-select dropdown toggle
+            const classSelectDropdown = document.getElementById('classSelectDropdown');
+            const classOptionsList = document.getElementById('classOptionsList');
+            const classSelectPlaceholder = document.getElementById('classSelectPlaceholder');
+
+            classSelectDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isHidden = classOptionsList.style.display === 'none';
+                classOptionsList.style.display = isHidden ? 'flex' : 'none';
+            });
+
+            document.addEventListener('click', () => {
+                classOptionsList.style.display = 'none';
+            });
+
+            classOptionsList.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent closing when selecting checkbox
+            });
+
+            // Update display text when class selection changes
+            const classCheckboxes = document.querySelectorAll('.class-cb');
+            classCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const selected = Array.from(document.querySelectorAll('.class-cb:checked')).map(el => el.value);
+                    if (selected.length === 0) {
+                        classSelectPlaceholder.textContent = 'Select Classes...';
+                        classSelectPlaceholder.style.color = 'var(--text-secondary)';
+                    } else {
+                        classSelectPlaceholder.textContent = selected.map(val => `Class ${val}`).join(', ');
+                        classSelectPlaceholder.style.color = 'var(--text-primary)';
+                    }
+                });
+            });
         });
 
         async function loadCentresCheckboxes() {
@@ -349,7 +418,7 @@
                     name: document.getElementById('eventName').value.trim(),
                     code: document.getElementById('eventCode').value.trim(),
                     year: document.getElementById('academicYear').value.trim(),
-                    class: document.getElementById('targetClass').value.trim(),
+                    class: Array.from(document.querySelectorAll('.class-cb:checked')).map(el => el.value).join(', '),
                     startDate: document.getElementById('startDate').value,
                     endDate: document.getElementById('endDate').value,
                     regStart: document.getElementById('regStart').value,
