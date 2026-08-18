@@ -203,6 +203,16 @@
                                     <input class="form-control stage-venue" type="text" value="Local Centres">
                                 </div>
                             </div>
+                            <div class="form-row" style="margin-top: 12px;">
+                                <div class="form-group">
+                                    <label class="form-label">Start Date</label>
+                                    <input class="form-control stage-start-date" type="date" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">End Date</label>
+                                    <input class="form-control stage-end-date" type="date" required>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -338,7 +348,178 @@
                     }
                 });
             });
+
+            // Check if we are in Edit Mode
+            const params = new URLSearchParams(window.location.search);
+            editEventId = params.get('event_id');
+            if (editEventId) {
+                document.querySelector('.app-header h1').textContent = 'Edit Event Configuration';
+                document.querySelector('.app-header p').textContent = 'Modify dynamic stages, assessments, criteria and advancement rules.';
+                document.getElementById('publishBtn').textContent = 'Save Updates';
+                await loadEventDataForEditing(editEventId);
+            }
         });
+
+        let editEventId = null;
+
+        async function loadEventDataForEditing(eventId) {
+            if (!window.supabaseClient) return;
+
+            try {
+                // 1. Fetch Event row
+                const { data: event, error: evErr } = await window.supabaseClient
+                    .from('events')
+                    .select('*')
+                    .eq('id', eventId)
+                    .single();
+
+                if (evErr) throw evErr;
+
+                // Populate Step 1 fields
+                document.getElementById('eventName').value = event.name || '';
+                document.getElementById('eventCode').value = event.event_code || '';
+                document.getElementById('academicYear').value = event.academic_year || '';
+                document.getElementById('startDate').value = event.start_date || '';
+                document.getElementById('endDate').value = event.end_date || '';
+                document.getElementById('regStart').value = event.registration_start || '';
+                document.getElementById('regEnd').value = event.registration_end || '';
+                document.getElementById('objective').value = event.objective || '';
+
+                // Populate Classes multiselect
+                if (event.class) {
+                    const classesList = event.class.split(', ');
+                    const classCbs = document.querySelectorAll('.class-cb');
+                    classCbs.forEach(cb => {
+                        cb.checked = classesList.includes(cb.value);
+                    });
+                    const placeholder = document.getElementById('classSelectPlaceholder');
+                    placeholder.textContent = classesList.map(val => `Class ${val}`).join(', ');
+                    placeholder.style.color = 'var(--text-primary)';
+                }
+
+                // 2. Fetch event centres
+                const { data: evCentres, error: ecErr } = await window.supabaseClient
+                    .from('event_centres')
+                    .select('centre_id')
+                    .eq('event_id', eventId);
+
+                if (ecErr) throw ecErr;
+
+                const centreCbs = document.querySelectorAll('.centre-cb');
+                const selectedCentres = evCentres.map(c => c.centre_id);
+                centreCbs.forEach(cb => {
+                    cb.checked = selectedCentres.includes(cb.value);
+                });
+
+                // 3. Fetch stages (Phases)
+                const { data: stages, error: stErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('*')
+                    .eq('event_id', eventId)
+                    .order('sequence');
+
+                if (stErr) throw stErr;
+
+                if (stages && stages.length > 0) {
+                    const container = document.getElementById('stagesList');
+                    container.innerHTML = ''; // clear default Phase #1
+
+                    for (const st of stages) {
+                        const seq = st.sequence;
+                        
+                        eventConfig.stages.push({
+                            sequence: seq,
+                            name: st.name,
+                            venue: st.venue || '',
+                            startDate: st.start_datetime ? st.start_datetime.split('T')[0] : '',
+                            endDate: st.end_datetime ? st.end_datetime.split('T')[0] : ''
+                        });
+
+                        eventConfig.advancement[seq] = {
+                            rule: st.advancement_rule_id || 'ALL_PARTICIPANTS',
+                            value: st.advancement_rule_value
+                        };
+
+                        const div = document.createElement('div');
+                        div.className = 'card stage-item';
+                        div.style.backgroundColor = 'var(--bg-surface-elevated)';
+                        div.style.padding = '16px';
+                        
+                        const removeBtn = seq === 1 ? '' : `<button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove(); reindexStages();" style="padding: 4px 8px; font-size: 0.75rem;">Remove</button>`;
+                        
+                        div.innerHTML = `
+                            <div style="display: flex; align-items: center; margin-bottom: 8px; justify-content: space-between;">
+                                <h4 style="font-size: 0.95rem;">Phase #${seq}</h4>
+                                ${removeBtn}
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Phase Name</label>
+                                    <input class="form-control stage-name" type="text" value="${st.name}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Venue</label>
+                                    <input class="form-control stage-venue" type="text" value="${st.venue || ''}">
+                                </div>
+                            </div>
+                            <div class="form-row" style="margin-top: 12px;">
+                                <div class="form-group">
+                                    <label class="form-label">Start Date</label>
+                                    <input class="form-control stage-start-date" type="date" value="${st.start_datetime ? st.start_datetime.split('T')[0] : ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">End Date</label>
+                                    <input class="form-control stage-end-date" type="date" value="${st.end_datetime ? st.end_datetime.split('T')[0] : ''}">
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(div);
+
+                        // 4. Fetch assessments (stages) for this phase
+                        const { data: assessments, error: assErr } = await window.supabaseClient
+                            .from('event_assessments')
+                            .select('*')
+                            .eq('stage_id', st.id)
+                            .order('sequence');
+
+                        if (assErr) throw assErr;
+
+                        eventConfig.assessments[seq] = [];
+
+                        for (const ass of assessments) {
+                            eventConfig.assessments[seq].push({
+                                sequence: ass.sequence,
+                                name: ass.name,
+                                max_marks: ass.max_marks
+                            });
+
+                            // 5. Fetch criteria for this assessment
+                            const { data: criteria, error: critErr } = await window.supabaseClient
+                                .from('assessment_criteria')
+                                .select('*')
+                                .eq('assessment_id', ass.id)
+                                .order('sequence');
+
+                            if (critErr) throw critErr;
+
+                            const key = `${seq}-${ass.sequence}`;
+                            eventConfig.criteria[key] = [];
+
+                            for (const crit of criteria) {
+                                eventConfig.criteria[key].push({
+                                    sequence: crit.sequence,
+                                    name: crit.name,
+                                    max_marks: crit.max_marks
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading event data for editing:", err);
+                alert("Failed to load event data for editing: " + err.message);
+            }
+        }
 
         async function loadCentresCheckboxes() {
             if (!window.supabaseClient) return;
@@ -387,18 +568,28 @@
             div.style.backgroundColor = 'var(--bg-surface-elevated)';
             div.style.padding = '16px';
             div.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h4 style="font-size: 0.95rem;">Stage #${seq}</h4>
+                <div style="display: flex; justify-content: justify-content; align-items: center; margin-bottom: 8px; justify-content: space-between;">
+                    <h4 style="font-size: 0.95rem;">Phase #${seq}</h4>
                     <button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove(); reindexStages();" style="padding: 4px 8px; font-size: 0.75rem;">Remove</button>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Stage Name</label>
+                        <label class="form-label">Phase Name</label>
                         <input class="form-control stage-name" type="text" placeholder="e.g. Finals">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Venue</label>
                         <input class="form-control stage-venue" type="text" placeholder="e.g. Head Office Auditorium">
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top: 12px;">
+                    <div class="form-group">
+                        <label class="form-label">Start Date</label>
+                        <input class="form-control stage-start-date" type="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Date</label>
+                        <input class="form-control stage-end-date" type="date" required>
                     </div>
                 </div>
             `;
@@ -408,7 +599,7 @@
         function reindexStages() {
             const items = document.querySelectorAll('#stagesList .stage-item');
             items.forEach((item, index) => {
-                item.querySelector('h4').textContent = `Stage #${index + 1}`;
+                item.querySelector('h4').textContent = `Phase #${index + 1}`;
             });
         }
 
@@ -433,7 +624,9 @@
                     eventConfig.stages.push({
                         sequence: index + 1,
                         name: el.querySelector('.stage-name').value.trim(),
-                        venue: el.querySelector('.stage-venue').value.trim()
+                        venue: el.querySelector('.stage-venue').value.trim(),
+                        startDate: el.querySelector('.stage-start-date').value,
+                        endDate: el.querySelector('.stage-end-date').value
                     });
                 });
             } else if (step === 3) {
@@ -538,15 +731,34 @@
                 eventConfig.stages.forEach(st => {
                     const div = document.createElement('div');
                     div.className = 'card';
-                    div.innerHTML = `
-                        <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                            Assessments for: ${st.name}
-                        </h4>
-                        <div id="assessments-container-${st.sequence}" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
-                            <!-- Insert assessments -->
+                    
+                    const savedAssess = eventConfig.assessments[st.sequence] || [];
+                    let rowsHtml = '';
+                    if (savedAssess.length > 0) {
+                        savedAssess.forEach((ass, index) => {
+                            const isFirst = index === 0;
+                            const removeBtn = isFirst ? '' : `<button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 12px; margin-top: 24px;">✖</button>`;
+                            rowsHtml += `
+                                <div class="form-row assessments-stage-${st.sequence}">
+                                    <div class="form-group" style="flex: 2;">
+                                        ${isFirst ? '<label class="form-label">Stage Name</label>' : ''}
+                                        <input class="form-control assess-name" type="text" placeholder="e.g. Spelling" value="${ass.name}">
+                                    </div>
+                                    <div class="form-group" style="flex: 1; display: flex; gap: 8px; align-items: flex-end;">
+                                        <div style="flex: 1;">
+                                            ${isFirst ? '<label class="form-label">Max Marks</label>' : ''}
+                                            <input class="form-control assess-marks" type="number" placeholder="20" value="${ass.max_marks}">
+                                        </div>
+                                        ${removeBtn}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        rowsHtml = `
                             <div class="form-row assessments-stage-${st.sequence}">
                                 <div class="form-group" style="flex: 2;">
-                                    <label class="form-label">Assessment Name</label>
+                                    <label class="form-label">Stage Name</label>
                                     <input class="form-control assess-name" type="text" placeholder="e.g. Spelling">
                                 </div>
                                 <div class="form-group" style="flex: 1;">
@@ -554,8 +766,17 @@
                                     <input class="form-control assess-marks" type="number" placeholder="20">
                                 </div>
                             </div>
+                        `;
+                    }
+
+                    div.innerHTML = `
+                        <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            Stages for: ${st.name}
+                        </h4>
+                        <div id="assessments-container-${st.sequence}" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                            ${rowsHtml}
                         </div>
-                        <button class="btn btn-secondary btn-sm" onclick="addAssessmentRow(${st.sequence})" style="margin-top: 12px; align-self: flex-start;">+ Add Assessment</button>
+                        <button class="btn btn-secondary btn-sm" onclick="addAssessmentRow(${st.sequence})" style="margin-top: 12px; align-self: flex-start;">+ Add Stage</button>
                     `;
                     container.appendChild(div);
                 });
@@ -570,11 +791,31 @@
                         const key = `${st.sequence}-${ass.sequence}`;
                         const div = document.createElement('div');
                         div.className = 'card';
-                        div.innerHTML = `
-                            <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                                Criteria for: ${st.name} ➔ ${ass.name} (${ass.max_marks} Marks)
-                            </h4>
-                            <div id="criteria-container-${key}" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                        
+                        const savedCriteria = eventConfig.criteria[key] || [];
+                        let rowsHtml = '';
+                        if (savedCriteria.length > 0) {
+                            savedCriteria.forEach((crit, index) => {
+                                const isFirst = index === 0;
+                                const removeBtn = isFirst ? '' : `<button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 12px; margin-top: 24px;">✖</button>`;
+                                rowsHtml += `
+                                    <div class="form-row criteria-assess-${key}">
+                                        <div class="form-group" style="flex: 2;">
+                                            ${isFirst ? '<label class="form-label">Criteria Parameter</label>' : ''}
+                                            <input class="form-control crit-name" type="text" placeholder="e.g. 10 Words" value="${crit.name}">
+                                        </div>
+                                        <div class="form-group" style="flex: 1; display: flex; gap: 8px; align-items: flex-end;">
+                                            <div style="flex: 1;">
+                                                ${isFirst ? '<label class="form-label">Weightage Marks</label>' : ''}
+                                                <input class="form-control crit-marks" type="number" placeholder="10" value="${crit.max_marks}">
+                                            </div>
+                                            ${removeBtn}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        } else {
+                            rowsHtml = `
                                 <div class="form-row criteria-assess-${key}">
                                     <div class="form-group" style="flex: 2;">
                                         <label class="form-label">Criteria Parameter</label>
@@ -585,6 +826,15 @@
                                         <input class="form-control crit-marks" type="number" placeholder="10">
                                     </div>
                                 </div>
+                            `;
+                        }
+
+                        div.innerHTML = `
+                            <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                Criteria for: ${st.name} ➔ ${ass.name} (${ass.max_marks} Marks)
+                            </h4>
+                            <div id="criteria-container-${key}" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                                ${rowsHtml}
                             </div>
                             <button class="btn btn-secondary btn-sm" onclick="addCriteriaRow('${key}')" style="margin-top: 12px; align-self: flex-start;">+ Add Criteria Row</button>
                         `;
@@ -601,6 +851,9 @@
                     if (idx < eventConfig.stages.length - 1) {
                         const div = document.createElement('div');
                         div.className = 'card';
+                        
+                        const savedAdv = eventConfig.advancement[st.sequence] || { rule: 'TOP_N_PER_CENTRE', value: 5 };
+                        
                         div.innerHTML = `
                             <h4 style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
                                 Advance from: ${st.name} to ${eventConfig.stages[idx+1].name}
@@ -609,15 +862,15 @@
                                 <div class="form-group">
                                     <label class="form-label">Advancement Rule</label>
                                     <select class="form-control" id="advRule-${st.sequence}">
-                                        <option value="TOP_N_PER_CENTRE">Top N Students per Centre</option>
-                                        <option value="TOP_N_OVERALL">Top N Students Overall</option>
-                                        <option value="PERCENTAGE_THRESHOLD">Percentage Threshold (%)</option>
-                                        <option value="ALL_PARTICIPANTS">All Present Participants</option>
+                                        <option value="TOP_N_PER_CENTRE" ${savedAdv.rule === 'TOP_N_PER_CENTRE' ? 'selected' : ''}>Top N Students per Centre</option>
+                                        <option value="TOP_N_OVERALL" ${savedAdv.rule === 'TOP_N_OVERALL' ? 'selected' : ''}>Top N Students Overall</option>
+                                        <option value="PERCENTAGE_THRESHOLD" ${savedAdv.rule === 'PERCENTAGE_THRESHOLD' ? 'selected' : ''}>Percentage Threshold (%)</option>
+                                        <option value="ALL_PARTICIPANTS" ${savedAdv.rule === 'ALL_PARTICIPANTS' ? 'selected' : ''}>All Present Participants</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Rule Limit Value (N / %)</label>
-                                    <input class="form-control" type="number" id="advVal-${st.sequence}" placeholder="5">
+                                    <input class="form-control" type="number" id="advVal-${st.sequence}" placeholder="5" value="${savedAdv.value !== null ? savedAdv.value : ''}">
                                 </div>
                             </div>
                         `;
@@ -638,9 +891,9 @@
                             <p><strong>Timeline:</strong> ${eventConfig.basic.startDate} to ${eventConfig.basic.endDate}</p>
                         </div>
                         <div>
-                            <h4 style="font-size: 1rem; margin-bottom: 8px;">Stages Map</h4>
+                            <h4 style="font-size: 1rem; margin-bottom: 8px;">Phases Map</h4>
                             <ol style="padding-left: 20px;">
-                                ${eventConfig.stages.map(s => `<li>${s.name} (Venue: ${s.venue})</li>`).join('')}
+                                ${eventConfig.stages.map(s => `<li>${s.name} (Venue: ${s.venue}, Dates: ${s.startDate || 'N/A'} to ${s.endDate || 'N/A'})</li>`).join('')}
                             </ol>
                         </div>
                     </div>
@@ -721,25 +974,57 @@
                 publishBtn.disabled = true;
                 publishBtn.textContent = 'Publishing...';
 
-                // Insert Root Event
-                const { data: event, error: evErr } = await window.supabaseClient
-                    .from('events')
-                    .insert({
-                        name: eventConfig.basic.name,
-                        event_code: eventConfig.basic.code,
-                        academic_year: eventConfig.basic.year,
-                        class: eventConfig.basic.class,
-                        start_date: eventConfig.basic.startDate || null,
-                        end_date: eventConfig.basic.endDate || null,
-                        registration_start: eventConfig.basic.regStart || null,
-                        registration_end: eventConfig.basic.regEnd || null,
-                        objective: eventConfig.basic.objective || null,
-                        status: 'PLANNING'
-                    })
-                    .select()
-                    .single();
+                let event;
+                if (editEventId) {
+                    // Update existing Event
+                    const { data: evData, error: evErr } = await window.supabaseClient
+                        .from('events')
+                        .update({
+                            name: eventConfig.basic.name,
+                            event_code: eventConfig.basic.code,
+                            academic_year: eventConfig.basic.year,
+                            class: eventConfig.basic.class,
+                            start_date: eventConfig.basic.startDate || null,
+                            end_date: eventConfig.basic.endDate || null,
+                            registration_start: eventConfig.basic.regStart || null,
+                            registration_end: eventConfig.basic.regEnd || null,
+                            objective: eventConfig.basic.objective || null
+                        })
+                        .eq('id', editEventId)
+                        .select()
+                        .single();
 
-                if (evErr) throw evErr;
+                    if (evErr) throw evErr;
+                    event = evData;
+
+                    // Delete existing centre mappings and stages (cascading deletes assessments and criteria)
+                    const { error: delEc } = await window.supabaseClient.from('event_centres').delete().eq('event_id', editEventId);
+                    if (delEc) throw delEc;
+
+                    const { error: delSt } = await window.supabaseClient.from('event_stages').delete().eq('event_id', editEventId);
+                    if (delSt) throw delSt;
+                } else {
+                    // Insert Root Event
+                    const { data: evData, error: evErr } = await window.supabaseClient
+                        .from('events')
+                        .insert({
+                            name: eventConfig.basic.name,
+                            event_code: eventConfig.basic.code,
+                            academic_year: eventConfig.basic.year,
+                            class: eventConfig.basic.class,
+                            start_date: eventConfig.basic.startDate || null,
+                            end_date: eventConfig.basic.endDate || null,
+                            registration_start: eventConfig.basic.regStart || null,
+                            registration_end: eventConfig.basic.regEnd || null,
+                            objective: eventConfig.basic.objective || null,
+                            status: 'PLANNING'
+                        })
+                        .select()
+                        .single();
+
+                    if (evErr) throw evErr;
+                    event = evData;
+                }
 
                 // Insert Event Centres mapping
                 if (eventConfig.basic.centres && eventConfig.basic.centres.length > 0) {
@@ -766,6 +1051,8 @@
                             name: st.name,
                             sequence: st.sequence,
                             venue: st.venue,
+                            start_datetime: st.startDate ? `${st.startDate}T00:00:00+05:30` : null,
+                            end_datetime: st.endDate ? `${st.endDate}T23:59:59+05:30` : null,
                             status: st.sequence === 1 ? 'SCHEDULED' : 'DRAFT',
                             advancement_rule_id: advRule.rule,
                             advancement_rule_value: advRule.value
@@ -810,7 +1097,11 @@
                     }
                 }
 
-                alert("Event successfully created and published in database!");
+                if (editEventId) {
+                    alert("Event configuration successfully updated!");
+                } else {
+                    alert("Event successfully created and published in database!");
+                }
                 window.location.href = 'events.html';
 
             } catch (err) {
@@ -820,7 +1111,7 @@
                 
                 const publishBtn = document.getElementById('publishBtn');
                 publishBtn.disabled = false;
-                publishBtn.textContent = 'Publish Event';
+                publishBtn.textContent = editEventId ? 'Save Updates' : 'Publish Event';
             }
         }
     </script>

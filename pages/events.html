@@ -117,8 +117,22 @@
                         
                         let actionsHtml = '';
                         if (isAdmin) {
+                            const now = new Date();
+                            // Set now to midnight of today for clean comparison
+                            now.setHours(0,0,0,0);
+                            const endDate = e.end_date ? new Date(e.end_date) : null;
+                            if (endDate) {
+                                endDate.setHours(0,0,0,0);
+                            }
+                            const isEditable = !endDate || now <= endDate;
+                            
+                            const editBtn = isEditable 
+                                ? `<button class="btn btn-primary btn-sm" onclick="window.location.href='event-builder.html?event_id=${e.id}'" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>`
+                                : `<button class="btn btn-secondary btn-sm" disabled style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px; opacity: 0.6; cursor: not-allowed;" title="Cannot edit: Final date has passed">Edit</button>`;
+
                             actionsHtml = `
                                 <td>
+                                    ${editBtn}
                                     <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
                                     <button class="btn btn-danger btn-sm" onclick="archiveEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Archive</button>
                                 </td>
