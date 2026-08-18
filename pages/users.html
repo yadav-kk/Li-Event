@@ -251,7 +251,7 @@
             try {
                 const { data: users, error } = await window.supabaseClient
                     .from('users')
-                    .select('*, centres(centre_name, centre_code)')
+                    .select('*, centres!centre_id(centre_name, centre_code)')
                     .order('name');
 
                 if (error) throw error;
@@ -285,6 +285,10 @@
                 });
             } catch (err) {
                 console.error("Error loading users list:", err);
+                const tbody = document.querySelector('#usersTable tbody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger);">Error: ${escapeHTML(err.message)}</td></tr>`;
+                }
             }
         }
 
