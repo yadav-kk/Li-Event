@@ -61,7 +61,7 @@
                 <div class="card" id="importPane" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
                     <h3 class="card-title">Bulk Import Participants from CSV</h3>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
-                        <span>CSV columns: <code>Participant Name</code>, <code>Gender</code>, <code>Class</code>, <code>Centre Code</code>, <code>School Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.</span>
+                        <span>CSV columns: <code>Participant Name</code>, <code>Gender</code>, <code>Class</code>, <code>Centre Code</code>, <code>Program Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.</span>
                         <button class="btn btn-secondary btn-sm" onclick="downloadSampleCSV()" style="padding: 6px 12px; font-size: 0.75rem;">Download Sample CSV</button>
                     </p>
                     
@@ -85,7 +85,7 @@
                                         <th>Name</th>
                                         <th>Gender</th>
                                         <th>Centre</th>
-                                        <th>School</th>
+                                        <th>Program</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -143,8 +143,8 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="studSchool">School</label>
-                                <select class="form-control" id="studSchool"></select>
+                                <label class="form-label" for="studProgram">Program</label>
+                                <select class="form-control" id="studProgram"></select>
                             </div>
                         </div>
 
@@ -195,7 +195,7 @@
                                     <th>Gender</th>
                                     <th>Event</th>
                                     <th>Centre</th>
-                                    <th>School</th>
+                                    <th>Program</th>
                                     <th>Guardian Mobile</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -215,7 +215,7 @@
     <!-- Student Setup Core JS -->
     <script>
         let centres = [];
-        let schools = [];
+        let programs = [];
         let loadedEvents = [];
         let importedParsedRows = [];
         let loadedStudents = [];
@@ -235,18 +235,18 @@
 
 
 
-            await fetchCentresSchoolsData();
+            await fetchCentresProgramsData();
             await loadStudentsList();
         });
 
-        async function fetchCentresSchoolsData() {
+        async function fetchCentresProgramsData() {
             if (!window.supabaseClient) return;
 
             try {
-                // Fetch centres, schools, and events concurrently
-                const [centresRes, schoolsRes, eventsRes] = await Promise.all([
+                // Fetch centres, programs, and events concurrently
+                const [centresRes, programsRes, eventsRes] = await Promise.all([
                     window.supabaseClient.from('centres').select('*').eq('status', 'active'),
-                    window.supabaseClient.from('schools').select('*').eq('status', 'active'),
+                    window.supabaseClient.from('programs').select('*').eq('status', 'active'),
                     window.supabaseClient.from('events')
                         .select('id, name, event_code, class')
                         .neq('status', 'ARCHIVED')
@@ -254,17 +254,17 @@
                 ]);
 
                 if (centresRes.error) throw centresRes.error;
-                if (schoolsRes.error) throw schoolsRes.error;
+                if (programsRes.error) throw programsRes.error;
                 if (eventsRes.error) throw eventsRes.error;
 
                 centres = centresRes.data || [];
-                schools = schoolsRes.data || [];
+                programs = programsRes.data || [];
                 loadedEvents = eventsRes.data || [];
 
                 // Populating dropdowns
                 const filterCentre = document.getElementById('filterCentre');
                 const studCentre = document.getElementById('studCentre');
-                const studSchool = document.getElementById('studSchool');
+                const studProgram = document.getElementById('studProgram');
 
                 // If user is a Centre Incharge, lock their centre selection!
                 const profile = window.Auth.getUserProfile();
@@ -304,28 +304,28 @@
                     });
                 }
 
-                // Populate schools based on selected centre
-                updateSchoolDropdown();
-                studCentre.addEventListener('change', updateSchoolDropdown);
+                // Populate programs based on selected centre
+                updateProgramDropdown();
+                studCentre.addEventListener('change', updateProgramDropdown);
 
             } catch (err) {
                 console.error("Error fetching dependencies:", err);
             }
         }
 
-        function updateSchoolDropdown() {
+        function updateProgramDropdown() {
+            const studProgram = document.getElementById('studProgram');
+            studProgram.innerHTML = '<option value="">-- No Program (Optional) --</option>';
             const selectedCentre = document.getElementById('studCentre').value;
-            const studSchool = document.getElementById('studSchool');
-            studSchool.innerHTML = '<option value="">-- No School (Optional) --</option>';
-
-            const filteredSchools = schools.filter(s => s.centre_id === selectedCentre);
-            filteredSchools.forEach(s => {
+            const filteredPrograms = programs.filter(s => s.centre_id === selectedCentre);
+            filteredPrograms.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.id;
-                opt.textContent = `${s.school_name} (${s.school_type})`;
-                studSchool.appendChild(opt);
+                opt.textContent = `${s.program_name} (${s.program_code})`;
+                studProgram.appendChild(opt);
             });
         }
+
 
         async function loadStudentsList() {
             if (!window.supabaseClient) return;
@@ -337,7 +337,7 @@
             try {
                 let query = window.supabaseClient
                     .from('students')
-                    .select('*, centres(centre_name), schools(school_name), event_participants(events(name))')
+                    .select('*, centres(centre_name), programs:program_id(program_name), event_participants(events(name))')
                     .order('created_at', { ascending: false });
 
                 if (selectedCentre) {
@@ -375,7 +375,7 @@
                             <td>${s.gender}</td>
                             <td>${eventName}</td>
                             <td>${s.centres ? s.centres.centre_name : 'N/A'}</td>
-                            <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
+                            <td>${s.programs ? s.programs.program_name : 'N/A'}</td>
                             <td>${s.guardian_mobile || 'N/A'}</td>
                             <td><span class="badge badge-completed">${s.status}</span></td>
                             <td>${actionsHtml}</td>
@@ -431,9 +431,9 @@
 
             document.getElementById('studCentre').value = s.centre_id || '';
             
-            // Re-populate schools dropdown based on centre
-            updateSchoolDropdown();
-            document.getElementById('studSchool').value = s.school_id || '';
+            // Re-populate programs dropdown based on centre
+            updateProgramDropdown();
+            document.getElementById('studProgram').value = s.program_id || '';
             
             document.getElementById('studGuardian').value = s.guardian_name || '';
             document.getElementById('studMobile').value = s.guardian_mobile || '';
@@ -478,7 +478,7 @@
             const dob = document.getElementById('studDOB').value || null;
             const targetClass = '1';
             const centreId = document.getElementById('studCentre').value;
-            const schoolId = document.getElementById('studSchool').value || null;
+            const programId = document.getElementById('studProgram').value || null;
             const guardianName = document.getElementById('studGuardian').value.trim();
             const guardianMobile = document.getElementById('studMobile').value.trim();
             const language = document.getElementById('studLanguage').value.trim();
@@ -506,7 +506,7 @@
                             date_of_birth: dob,
                             class: targetClass,
                             centre_id: centreId,
-                            school_id: schoolId,
+                            program_id: programId,
                             guardian_name: guardianName,
                             guardian_mobile: guardianMobile,
                             language
@@ -597,7 +597,7 @@
                             date_of_birth: dob,
                             class: targetClass,
                             centre_id: centreId,
-                            school_id: schoolId,
+                            program_id: programId,
                             guardian_name: guardianName,
                             guardian_mobile: guardianMobile,
                             language,
@@ -668,7 +668,7 @@
                 return;
             }
 
-            // Headers: Participant Name, Gender, Class, Centre Code, School Code, Guardian Name, Guardian Mobile, Language
+            // Headers: Participant Name, Gender, Class, Centre Code, Program Code, Guardian Name, Guardian Mobile, Language
             const headers = rows[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
             
             importedParsedRows = [];
@@ -686,18 +686,18 @@
                 const gender = cols[1];
                 const targetClass = cols[2] || '1';
                 const centreCode = cols[3];
-                const schoolCode = cols[4];
+                const programCode = cols[4];
                 const guardName = cols[5];
                 const guardMobile = cols[6];
                 const lang = cols[7] || 'Hindi';
 
                 // Simple validation check
-                const isValid = name && gender && centreCode && schoolCode;
+                const isValid = name && gender && centreCode && programCode;
                 
                 if (isValid) {
                     validCount++;
                     importedParsedRows.push({
-                        name, gender, targetClass, centreCode, schoolCode, guardName, guardMobile, lang
+                        name, gender, targetClass, centreCode, programCode, guardName, guardMobile, lang
                     });
 
                     // Add to preview table
@@ -706,7 +706,7 @@
                         <td>${name}</td>
                         <td>${gender}</td>
                         <td>${centreCode}</td>
-                        <td>${schoolCode}</td>
+                        <td>${programCode}</td>
                     `;
                     previewTbody.appendChild(tr);
                 } else {
@@ -751,9 +751,9 @@
                     const matchingCentre = centres.find(c => c.centre_code === row.centreCode);
                     if (!matchingCentre) continue;
 
-                    // 2. Resolve School ID from Code
-                    const matchingSchool = schools.find(s => s.school_code === row.schoolCode);
-                    const schoolIdVal = matchingSchool ? matchingSchool.id : null;
+                    // 2. Resolve Program ID from Code
+                    const matchingProgram = programs.find(s => s.program_code === row.programCode);
+                    const programIdVal = matchingProgram ? matchingProgram.id : null;
 
                     const suffix = Math.floor(100000 + Math.random() * 900000);
                     const studentIdCode = `GT-LIT-2026-${suffix}`;
@@ -767,7 +767,7 @@
                             gender: row.gender,
                             class: row.targetClass,
                             centre_id: matchingCentre.id,
-                            school_id: schoolIdVal,
+                            program_id: programIdVal,
                             guardian_name: row.guardName,
                             guardian_mobile: row.guardMobile,
                             language: row.lang,
@@ -824,7 +824,7 @@
         function downloadSampleCSV() {
             // Build conforming CSV content template
             const csvContent = "data:text/csv;charset=utf-8," 
-                + "Participant Name,Gender,Class,Centre Code,School Code,Guardian Name,Guardian Mobile,Language\n"
+                + "Participant Name,Gender,Class,Centre Code,Program Code,Guardian Name,Guardian Mobile,Language\n"
                 + "Amit Kumar,M,V,DL-02,SCH-01,Rajesh Kumar,9876543210,Hindi\n"
                 + "Sunita Devi,F,V,HR-02,SCH-02,Sanjay Singh,9876543211,English\n";
                 

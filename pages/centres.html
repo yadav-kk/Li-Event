@@ -100,10 +100,62 @@
                                     <th>State</th>
                                     <th>Address</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching centres registry...</td></tr>
+                                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Fetching centres registry...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Programs Modal dialog -->
+                <div class="card" id="programsModal" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 class="card-title">Manage Programs at <span id="modalCentreName" style="color: var(--primary);"></span></h3>
+                        <button class="btn btn-secondary" style="padding: 4px 8px;" onclick="closeProgramsModal()">Close</button>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0 16px 0;">
+                    
+                    <!-- Program Form -->
+                    <form id="addProgramForm" onsubmit="saveNewProgram(event)" style="margin-bottom: 24px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Program Name</label>
+                                <select id="progName" class="form-control" required onchange="autoFillProgramCode()">
+                                    <option value="">-- Choose Program --</option>
+                                    <option value="Smart Class/Pathashala">Smart Class/Pathashala</option>
+                                    <option value="Basic IT">Basic IT</option>
+                                    <option value="Vocational">Vocational</option>
+                                    <option value="Gyantantra">Gyantantra</option>
+                                    <option value="NGO">NGO</option>
+                                    <option value="GOVERNMENT">Government</option>
+                                    <option value="COMMUNITY">Community</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Program Code</label>
+                                <input type="text" id="progCode" class="form-control" placeholder="e.g. SC-DL-01" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 8px;">+ Add Program</button>
+                    </form>
+
+                    <!-- Programs List Table -->
+                    <div class="table-container" style="border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;">
+                        <table class="data-table" id="centreProgramsTable">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No programs configured yet.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -129,6 +181,8 @@
             window.Permissions.applyUIRules();
         });
 
+        let loadedCentres = [];
+
         async function loadCentresRegistry() {
             if (!window.supabaseClient) return;
 
@@ -139,12 +193,13 @@
                     .order('centre_code', { ascending: true });
 
                 if (err) throw err;
+                loadedCentres = centres || [];
 
                 const tbody = document.querySelector('#allCentresTable tbody');
                 tbody.innerHTML = '';
 
                 if (!centres || centres.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No centres found.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No centres found.</td></tr>`;
                     return;
                 }
 
@@ -157,6 +212,9 @@
                         <td>${escapeHTML(centre.state || '-')}</td>
                         <td>${escapeHTML(centre.address || '-')}</td>
                         <td><span class="badge badge-${centre.status.toLowerCase()}">${centre.status}</span></td>
+                        <td>
+                            <button class="btn btn-secondary btn-sm" onclick="managePrograms('${centre.id}', '${centre.centre_name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Manage Programs</button>
+                        </td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -204,6 +262,138 @@
             } catch (err) {
                 console.error("Error saving centre:", err);
                 alert("Error saving centre: " + err.message);
+            }
+        }
+
+        let activeCentreId = null;
+        let activeCentreObject = null;
+
+        function closeProgramsModal() {
+            document.getElementById('programsModal').style.display = 'none';
+            activeCentreId = null;
+            activeCentreObject = null;
+        }
+
+        async function managePrograms(centreId, centreName) {
+            const centre = loadedCentres.find(c => c.id === centreId);
+            if (!centre) return;
+
+            activeCentreId = centreId;
+            activeCentreObject = centre;
+
+            document.getElementById('modalCentreName').textContent = centre.centre_name;
+            document.getElementById('programsModal').style.display = 'block';
+            document.getElementById('programsModal').scrollIntoView({ behavior: 'smooth' });
+
+            await loadCentrePrograms();
+        }
+
+        function autoFillProgramCode() {
+            const progSelect = document.getElementById('progName');
+            const codeInput = document.getElementById('progCode');
+            const centre = activeCentreObject;
+            if (!progSelect.value || !centre) return;
+
+            // Generate clean acronym
+            let acronym = progSelect.value.split('/')
+                .map(word => word.trim().split(' ').map(w => w[0]).join(''))
+                .join('-');
+            acronym = acronym.replace(/[^a-zA-Z-]/g, '').toUpperCase();
+
+            codeInput.value = `${acronym}-${centre.centre_code}`;
+        }
+
+        async function loadCentrePrograms() {
+            if (!window.supabaseClient || !activeCentreId) return;
+
+            try {
+                const { data: progs, error } = await window.supabaseClient
+                    .from('programs')
+                    .select('*')
+                    .eq('centre_id', activeCentreId)
+                    .order('program_code');
+
+                if (error) throw error;
+
+                const tbody = document.querySelector('#centreProgramsTable tbody');
+                tbody.innerHTML = '';
+
+                if (!progs || progs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No programs configured yet.</td></tr>`;
+                    return;
+                }
+
+                progs.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(p.program_code)}</strong></td>
+                        <td>${escapeHTML(p.program_name)}</td>
+                        <td><span class="badge badge-active">${escapeHTML(p.program_type || 'OTHER')}</span></td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="deleteProgram('${p.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading programs:", err);
+            }
+        }
+
+        async function saveNewProgram(event) {
+            event.preventDefault();
+            if (!window.supabaseClient || !activeCentreId) return;
+
+            const name = document.getElementById('progName').value;
+            const code = document.getElementById('progCode').value.trim();
+
+            let progType = 'OTHER';
+            if (name.includes('Smart Class')) progType = 'SMART_CLASS_PATHASHALA';
+            else if (name.includes('Basic IT')) progType = 'BASIC_IT';
+            else if (name.includes('Vocational')) progType = 'VOCATIONAL';
+            else if (name.includes('Gyantantra')) progType = 'GYANTANTRA';
+            else if (name.includes('NGO')) progType = 'NGO';
+            else if (name.includes('GOVERNMENT')) progType = 'GOVERNMENT';
+            else if (name.includes('COMMUNITY')) progType = 'COMMUNITY';
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('programs')
+                    .insert({
+                        program_name: name,
+                        program_code: code,
+                        program_type: progType,
+                        centre_id: activeCentreId,
+                        status: 'active'
+                    });
+
+                if (error) throw error;
+
+                alert('Program added successfully!');
+                document.getElementById('addProgramForm').reset();
+                await loadCentrePrograms();
+            } catch (err) {
+                console.error("Error adding program:", err);
+                alert("Error: " + err.message);
+            }
+        }
+
+        async function deleteProgram(programId) {
+            if (!confirm("Are you sure you want to delete this program? Any participants mapped to this program will lose their program association.")) return;
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('programs')
+                    .delete()
+                    .eq('id', programId);
+
+                if (error) throw error;
+
+                alert('Program deleted successfully!');
+                await loadCentrePrograms();
+            } catch (err) {
+                console.error("Error deleting program:", err);
+                alert("Error deleting program: " + err.message);
             }
         }
 

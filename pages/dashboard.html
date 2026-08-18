@@ -180,7 +180,7 @@
                                             <th>Participant ID</th>
                                             <th>Name</th>
                                             <th>Gender</th>
-                                            <th>School</th>
+                                            <th>Program</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -358,7 +358,7 @@
             try {
                 // Fetch centre details and stats in parallel
                 const [studentsRes, evidenceRes, qualifiedRes, alignedEventsRes] = await Promise.all([
-                    window.supabaseClient.from('students').select('*, schools(school_name)').eq('centre_id', centreId).order('created_at', { ascending: false }),
+                    window.supabaseClient.from('students').select('*, programs:program_id(program_name)').eq('centre_id', centreId).order('created_at', { ascending: false }),
                     window.supabaseClient.from('evidence').select('*', { count: 'exact', head: true }).eq('centre_id', centreId),
                     window.supabaseClient.from('stage_participants').select('*, participant_id!inner(student_id!inner(centre_id))', { count: 'exact', head: true }).eq('participant_id.student_id.centre_id', centreId).eq('qualification_status', 'QUALIFIED'),
                     window.supabaseClient.from('event_centres').select('events(*)').eq('centre_id', centreId)
@@ -385,7 +385,7 @@
                             <td>${s.student_id}</td>
                             <td>${s.name}</td>
                             <td>${s.gender}</td>
-                            <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
+                            <td>${s.programs ? s.programs.program_name : 'N/A'}</td>
                         `;
                         tbody.appendChild(tr);
                     });
