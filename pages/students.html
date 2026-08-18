@@ -65,6 +65,13 @@
                     </p>
                     
                     <div class="form-group" style="margin-top: 12px;">
+                        <label class="form-label" for="csvEvent">Register Students to Event</label>
+                        <select class="form-control" id="csvEvent" required>
+                            <option value="">-- Select Event --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 12px;">
                         <input class="form-control" type="file" id="csvFileInput" accept=".csv" style="padding: 12px;">
                     </div>
                     
@@ -98,6 +105,13 @@
                     <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
                     
                     <form id="enrollStudentForm">
+                        <div class="form-group">
+                            <label class="form-label" for="studEvent">Event to Register Under</label>
+                            <select class="form-control" id="studEvent" required>
+                                <option value="">-- Select Event --</option>
+                            </select>
+                        </div>
+
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="studName">Full Name</label>
@@ -105,7 +119,8 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="studGender">Gender</label>
-                                <select class="form-control" id="studGender">
+                                <select class="form-control" id="studGender" required>
+                                    <option value="">-- Select Gender --</option>
                                     <option value="M">Male</option>
                                     <option value="F">Female</option>
                                     <option value="Other">Other</option>
@@ -116,18 +131,22 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="studDOB">Date of Birth</label>
-                                <input class="form-control" type="date" id="studDOB">
+                                <input class="form-control" type="date" id="studDOB" required>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="studClass">Class</label>
-                                <input class="form-control" type="text" id="studClass" value="V" readonly>
+                                <select class="form-control" id="studClass" required>
+                                    <option value="">-- Select Class --</option>
+                                </select>
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="studCentre">Centre</label>
-                                <select class="form-control" id="studCentre" required></select>
+                                <select class="form-control" id="studCentre" required>
+                                    <option value="">-- Select Centre --</option>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="studSchool">School</label>
@@ -137,24 +156,20 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label" for="studGuardian">Guardian Name</label>
+                                <label class="form-label" for="studGuardian">Guardian Name (Optional)</label>
                                 <input class="form-control" type="text" id="studGuardian">
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="studMobile">Guardian Mobile</label>
+                                <label class="form-label" for="studMobile">Guardian Mobile (Optional)</label>
                                 <input class="form-control" type="text" id="studMobile">
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label" for="studLanguage">Language</label>
-                            <input class="form-control" type="text" id="studLanguage" value="Hindi">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="studEvent">Event to Register Under</label>
-                            <select class="form-control" id="studEvent" required>
-                                <option value="">-- Select Event --</option>
+                            <select class="form-control" id="studLanguage" required>
+                                <option value="Hindi" selected>Hindi</option>
+                                <option value="English">English</option>
                             </select>
                         </div>
 
@@ -185,6 +200,7 @@
                                     <th>Name</th>
                                     <th>Gender</th>
                                     <th>Class</th>
+                                    <th>Event</th>
                                     <th>Centre</th>
                                     <th>School</th>
                                     <th>Guardian Mobile</th>
@@ -206,6 +222,7 @@
     <script>
         let centres = [];
         let schools = [];
+        let loadedEvents = [];
         let importedParsedRows = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -220,6 +237,27 @@
             document.getElementById('enrollStudentForm').addEventListener('submit', handleSingleRegistration);
             document.getElementById('filterCentre').addEventListener('change', loadStudentsList);
             document.getElementById('csvFileInput').addEventListener('change', handleCSVFileSelect);
+
+            document.getElementById('studEvent').addEventListener('change', () => {
+                const eventId = document.getElementById('studEvent').value;
+                const studClass = document.getElementById('studClass');
+                studClass.innerHTML = '<option value="">-- Select Class --</option>';
+
+                const selectedEvent = loadedEvents.find(e => e.id === eventId);
+                if (selectedEvent && selectedEvent.class) {
+                    const classes = selectedEvent.class.split(', ');
+                    classes.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        opt.textContent = `Class ${c}`;
+                        studClass.appendChild(opt);
+                    });
+                    
+                    if (classes.length === 1) {
+                        studClass.value = classes[0];
+                    }
+                }
+            });
 
             await fetchCentresSchoolsData();
             await loadStudentsList();
@@ -268,18 +306,24 @@
                 // Fetch events
                 const { data: eData } = await window.supabaseClient
                     .from('events')
-                    .select('id, name, event_code')
+                    .select('id, name, event_code, class')
                     .neq('status', 'ARCHIVED')
                     .order('created_at', { ascending: false });
 
+                loadedEvents = eData || [];
                 const studEvent = document.getElementById('studEvent');
+                const csvEvent = document.getElementById('csvEvent');
                 studEvent.innerHTML = '<option value="">-- Select Event --</option>';
+                csvEvent.innerHTML = '<option value="">-- Select Event --</option>';
                 if (eData && eData.length > 0) {
                     eData.forEach(e => {
                         const opt = document.createElement('option');
                         opt.value = e.id;
                         opt.textContent = `${e.name} (${e.event_code})`;
                         studEvent.appendChild(opt);
+
+                        const optCsv = opt.cloneNode(true);
+                        csvEvent.appendChild(optCsv);
                     });
                 }
 
@@ -311,12 +355,12 @@
 
             const selectedCentre = document.getElementById('filterCentre').value;
             const tbody = document.querySelector('#studentsTable tbody');
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Refreshing list...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Refreshing list...</td></tr>`;
 
             try {
                 let query = window.supabaseClient
                     .from('students')
-                    .select('*, centres(centre_name), schools(school_name)')
+                    .select('*, centres(centre_name), schools(school_name), event_participants(events(name))')
                     .order('created_at', { ascending: false });
 
                 if (selectedCentre) {
@@ -330,12 +374,14 @@
 
                 if (students && students.length > 0) {
                     students.forEach(s => {
+                        const eventName = s.event_participants && s.event_participants[0] && s.event_participants[0].events ? s.event_participants[0].events.name : 'N/A';
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td><strong>${s.student_id}</strong></td>
                             <td>${s.name}</td>
                             <td>${s.gender}</td>
                             <td>Class ${s.class}</td>
+                            <td>${eventName}</td>
                             <td>${s.centres ? s.centres.centre_name : 'N/A'}</td>
                             <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
                             <td>${s.guardian_mobile || 'N/A'}</td>
@@ -344,7 +390,7 @@
                         tbody.appendChild(tr);
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No student records found.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No student records found.</td></tr>`;
                 }
 
             } catch (err) {
@@ -535,10 +581,27 @@
         async function executeBulkImport() {
             if (!window.supabaseClient || importedParsedRows.length === 0) return;
 
+            const eventId = document.getElementById('csvEvent').value;
+            if (!eventId) {
+                alert("Please select an event to register the imported students under.");
+                return;
+            }
+
             try {
                 const btn = document.getElementById('confirmImportBtn');
                 btn.disabled = true;
                 btn.textContent = 'Importing...';
+
+                // Fetch first stage ID of selected event
+                const { data: firstStage, error: stageErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('id')
+                    .eq('event_id', eventId)
+                    .eq('sequence', 1)
+                    .single();
+
+                if (stageErr) throw stageErr;
+                const stageId = firstStage.id;
 
                 for (const row of importedParsedRows) {
                     // 1. Resolve Centre ID from Code
@@ -572,16 +635,16 @@
 
                     if (insErr) throw insErr;
 
-                    // Register to active Event
+                    // Register to selected Event
                     const { data: eventPart, error: regErr } = await window.supabaseClient
                         .from('event_participants')
                         .insert({
-                            event_id: 'e9000000-0000-0000-0000-000000000001',
+                            event_id: eventId,
                             student_id: student.id,
                             registration_number: `REG-2026-${suffix}`,
                             registration_status: 'APPROVED',
                             eligibility_status: 'ELIGIBLE',
-                            current_stage_id: 'e1900000-0001-0000-0000-000000000001'
+                            current_stage_id: stageId
                         })
                         .select()
                         .single();
@@ -592,7 +655,7 @@
                     await window.supabaseClient
                         .from('stage_participants')
                         .insert({
-                            stage_id: 'e1900000-0001-0000-0000-000000000001',
+                            stage_id: stageId,
                             participant_id: eventPart.id,
                             qualification_status: 'PENDING',
                             attendance: 'PRESENT'
