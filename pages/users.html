@@ -90,16 +90,27 @@
                                 <select id="usrRole" class="form-control" required>
                                     <option value="super_admin">Super Admin</option>
                                     <option value="prog_admin">Program Admin</option>
+                                    <option value="coordinator">Coordinator</option>
                                     <option value="centre_incharge">Centre Incharge</option>
                                     <option value="judge">Judge / Assessor</option>
                                     <option value="management">Management (Read-Only)</option>
                                 </select>
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="centreSingleSelectGroup">
                                 <label class="form-label">Associated Centre (Optional)</label>
                                 <select id="usrCentre" class="form-control">
                                     <option value="">No Centre (HQ / All)</option>
                                 </select>
+                            </div>
+                            <div class="form-group" id="centreMultiSelectGroup" style="display: none; position: relative;">
+                                <label class="form-label">Associated Centres (Coordinator)</label>
+                                <div class="form-control" id="centreMultiSelectDropdown" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                    <span id="centreMultiSelectPlaceholder" style="color: var(--text-secondary);">Select Centres...</span>
+                                    <span>▼</span>
+                                </div>
+                                <div id="centreMultiOptionsList" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; z-index: 1000; max-height: 200px; overflow-y: auto; padding: 12px; flex-direction: column; gap: 8px; margin-top: 4px;">
+                                    <!-- Populated dynamically -->
+                                </div>
                             </div>
                         </div>
 
@@ -209,6 +220,38 @@
             loadAssessmentsDropdown().catch(err => console.error("Error loading assessments:", err));
             loadUsersList().catch(err => console.error("Error loading users:", err));
             loadAccessAssignments().catch(err => console.error("Error loading access assignments:", err));
+            // Multi-select dropdown toggle
+            const dropdown = document.getElementById('centreMultiSelectDropdown');
+            const optionsList = document.getElementById('centreMultiOptionsList');
+
+            dropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isHidden = optionsList.style.display === 'none';
+                optionsList.style.display = isHidden ? 'flex' : 'none';
+            });
+
+            document.addEventListener('click', () => {
+                optionsList.style.display = 'none';
+            });
+
+            optionsList.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // Toggle single vs multi-select depending on selected role
+            document.getElementById('usrRole').addEventListener('change', (e) => {
+                const role = e.target.value;
+                const singleGroup = document.getElementById('centreSingleSelectGroup');
+                const multiGroup = document.getElementById('centreMultiSelectGroup');
+                if (role === 'coordinator') {
+                    singleGroup.style.display = 'none';
+                    multiGroup.style.display = 'block';
+                } else {
+                    singleGroup.style.display = 'block';
+                    multiGroup.style.display = 'none';
+                }
+            });
+
             window.Permissions.applyUIRules();
         });
 
@@ -235,6 +278,36 @@
                     opt2.textContent = `${c.centre_code} - ${c.centre_name}`;
                     assignCentreSelect.appendChild(opt2);
                 });
+
+                // Populate multi-select checkbox options
+                const multiList = document.getElementById('centreMultiOptionsList');
+                multiList.innerHTML = '';
+                centres.forEach(c => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '8px';
+                    label.style.cursor = 'pointer';
+                    label.innerHTML = `
+                        <input type="checkbox" class="usr-centre-cb" value="${c.id}" data-name="${c.centre_code}">
+                        <span>${c.centre_code} - ${c.centre_name}</span>
+                    `;
+                    multiList.appendChild(label);
+                });
+
+                // Update display text when selection changes
+                multiList.addEventListener('change', () => {
+                    const selected = Array.from(document.querySelectorAll('.usr-centre-cb:checked')).map(el => el.getAttribute('data-name'));
+                    const placeholder = document.getElementById('centreMultiSelectPlaceholder');
+                    if (selected.length === 0) {
+                        placeholder.textContent = 'Select Centres...';
+                        placeholder.style.color = 'var(--text-secondary)';
+                    } else {
+                        placeholder.textContent = selected.join(', ');
+                        placeholder.style.color = 'var(--text-primary)';
+                    }
+                });
+
             } catch (err) {
                 console.error("Error loading centres dropdowns:", err);
             }
@@ -266,7 +339,7 @@
             try {
                 const { data: users, error } = await window.supabaseClient
                     .from('users')
-                    .select('*, centres!centre_id(centre_name, centre_code), user_roles(role_id)')
+                    .select('*, centres!centre_id(centre_name, centre_code), user_roles(role_id), user_centres(centres(centre_code, centre_name))')
                     .order('name');
 
                 if (error) throw error;
@@ -282,9 +355,15 @@
                 users.forEach(u => {
                     const uRole = u.user_roles && u.user_roles[0] ? u.user_roles[0].role_id : 'N/A';
                     
+                    let centreText = 'HQ / All';
+                    if (uRole === 'coordinator' && u.user_centres && u.user_centres.length > 0) {
+                        centreText = u.user_centres.map(uc => uc.centres ? uc.centres.centre_code : '').filter(val => val.length > 0).join(', ');
+                    } else if (u.centres) {
+                        centreText = `${u.centres.centre_code} - ${u.centres.centre_name}`;
+                    }
+
                     // Populate Table
                     const tr = document.createElement('tr');
-                    const centreText = u.centres ? `${u.centres.centre_code} - ${u.centres.centre_name}` : 'HQ / All';
                     tr.innerHTML = `
                         <td><strong>${escapeHTML(u.name)}</strong></td>
                         <td>${escapeHTML(u.email)}</td>
@@ -298,7 +377,7 @@
                     tbody.appendChild(tr);
 
                     // Populate Judges only in Access dropdown
-                    if (['judge', 'centre_incharge', 'super_admin'].includes(uRole)) {
+                    if (['judge', 'centre_incharge', 'super_admin', 'coordinator'].includes(uRole)) {
                         const opt = document.createElement('option');
                         opt.value = u.id;
                         opt.textContent = `${u.name} (${uRole})`;
@@ -321,6 +400,16 @@
             document.querySelector('#userModal .card-title').textContent = 'Create New User Account';
             document.querySelector('#userModal button[type="submit"]').textContent = 'Create Account';
             document.getElementById('createUserForm').reset();
+
+            // Reset checkboxes
+            document.querySelectorAll('.usr-centre-cb').forEach(cb => cb.checked = false);
+            document.getElementById('centreMultiSelectPlaceholder').textContent = 'Select Centres...';
+            document.getElementById('centreMultiSelectPlaceholder').style.color = 'var(--text-secondary)';
+
+            // Hide multi-select by default
+            document.getElementById('centreSingleSelectGroup').style.display = 'block';
+            document.getElementById('centreMultiSelectGroup').style.display = 'none';
+
             document.getElementById('userModal').style.display = 'block';
         }
 
@@ -328,6 +417,7 @@
             editUserId = null;
             document.getElementById('userModal').style.display = 'none';
             document.getElementById('createUserForm').reset();
+            document.querySelectorAll('.usr-centre-cb').forEach(cb => cb.checked = false);
         }
 
         function editUser(userId) {
@@ -347,6 +437,41 @@
             document.getElementById('usrRole').value = roleVal;
             document.getElementById('usrCentre').value = u.centre_id || '';
 
+            // Toggle single vs multi select visibility
+            const singleGroup = document.getElementById('centreSingleSelectGroup');
+            const multiGroup = document.getElementById('centreMultiSelectGroup');
+            if (roleVal === 'coordinator') {
+                singleGroup.style.display = 'none';
+                multiGroup.style.display = 'block';
+            } else {
+                singleGroup.style.display = 'block';
+                multiGroup.style.display = 'none';
+            }
+
+            // Populate checkboxes
+            document.querySelectorAll('.usr-centre-cb').forEach(cb => cb.checked = false);
+            const selectedNames = [];
+            if (roleVal === 'coordinator' && u.user_centres) {
+                u.user_centres.forEach(uc => {
+                    if (uc.centres) {
+                        const cb = Array.from(document.querySelectorAll('.usr-centre-cb')).find(el => el.value === uc.centres.id);
+                        if (cb) {
+                            cb.checked = true;
+                            selectedNames.push(uc.centres.centre_code);
+                        }
+                    }
+                });
+            }
+
+            const placeholder = document.getElementById('centreMultiSelectPlaceholder');
+            if (selectedNames.length === 0) {
+                placeholder.textContent = 'Select Centres...';
+                placeholder.style.color = 'var(--text-secondary)';
+            } else {
+                placeholder.textContent = selectedNames.join(', ');
+                placeholder.style.color = 'var(--text-primary)';
+            }
+
             document.getElementById('userModal').style.display = 'block';
         }
 
@@ -362,9 +487,15 @@
             const role = document.getElementById('usrRole').value;
             const centreId = document.getElementById('usrCentre').value || null;
 
-            // Centre Incharge validation rule: must have exactly one centre assigned
+            const selectedCentres = Array.from(document.querySelectorAll('.usr-centre-cb:checked')).map(el => el.value);
+
+            // Validation rules
             if (role === 'centre_incharge' && !centreId) {
                 alert("Centre Incharge must have exactly one centre assigned.");
+                return;
+            }
+            if (role === 'coordinator' && selectedCentres.length === 0) {
+                alert("Coordinator must have at least one centre assigned.");
                 return;
             }
 
@@ -378,13 +509,13 @@
                             email,
                             password,
                             mobile,
-                            centre_id: centreId
+                            centre_id: role === 'coordinator' ? null : centreId
                         })
                         .eq('id', editUserId);
 
                     if (updErr) throw updErr;
 
-                    // Clean user roles join table for this user
+                    // Clean user roles
                     const { error: delErr } = await window.supabaseClient
                         .from('user_roles')
                         .delete()
@@ -392,7 +523,7 @@
 
                     if (delErr) throw delErr;
 
-                    // Write updated role row
+                    // Insert role
                     const { error: roleErr } = await window.supabaseClient
                         .from('user_roles')
                         .insert({
@@ -401,6 +532,25 @@
                         });
 
                     if (roleErr) throw roleErr;
+
+                    // Sync Coordinator centres in user_centres mapping table
+                    const { error: delUcErr } = await window.supabaseClient
+                        .from('user_centres')
+                        .delete()
+                        .eq('user_id', editUserId);
+                    if (delUcErr) throw delUcErr;
+
+                    if (role === 'coordinator') {
+                        for (const cId of selectedCentres) {
+                            const { error: insUcErr } = await window.supabaseClient
+                                .from('user_centres')
+                                .insert({
+                                    user_id: editUserId,
+                                    centre_id: cId
+                                });
+                            if (insUcErr) throw insUcErr;
+                        }
+                    }
 
                     alert('User account updated successfully!');
                 } else {
@@ -412,7 +562,7 @@
                             email,
                             password,
                             mobile,
-                            centre_id: centreId,
+                            centre_id: role === 'coordinator' ? null : centreId,
                             status: 'active'
                         })
                         .select()
@@ -429,6 +579,19 @@
                         });
 
                     if (roleErr) throw roleErr;
+
+                    // Insert Coordinator centres in user_centres mapping table
+                    if (role === 'coordinator') {
+                        for (const cId of selectedCentres) {
+                            const { error: insUcErr } = await window.supabaseClient
+                                .from('user_centres')
+                                .insert({
+                                    user_id: usr.id,
+                                    centre_id: cId
+                                });
+                            if (insUcErr) throw insUcErr;
+                        }
+                    }
 
                     alert('User account created successfully!');
                 }

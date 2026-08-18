@@ -206,11 +206,12 @@
                                     <th>School</th>
                                     <th>Guardian Mobile</th>
                                     <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Fetching students list...</td></tr>
-                            </tbody>
+                                    <th>Actions</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Fetching students list...</td></tr>
+                              </tbody>
                         </table>
                     </div>
                 </div>
@@ -225,6 +226,7 @@
         let schools = [];
         let loadedEvents = [];
         let importedParsedRows = [];
+        let loadedStudents = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'centre_incharge', 'coordinator']);
@@ -356,7 +358,7 @@
 
             const selectedCentre = document.getElementById('filterCentre').value;
             const tbody = document.querySelector('#studentsTable tbody');
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Refreshing list...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Refreshing list...</td></tr>`;
 
             try {
                 let query = window.supabaseClient
@@ -372,10 +374,26 @@
                 if (error) throw error;
 
                 tbody.innerHTML = '';
+                loadedStudents = students || [];
+
+                const canEdit = window.Auth.hasRole(['centre_incharge', 'super_admin', 'prog_admin']);
+                const canDelete = window.Auth.hasRole(['coordinator', 'super_admin', 'prog_admin']);
 
                 if (students && students.length > 0) {
                     students.forEach(s => {
                         const eventName = s.event_participants && s.event_participants[0] && s.event_participants[0].events ? s.event_participants[0].events.name : 'N/A';
+                        
+                        let actionsHtml = '';
+                        if (canEdit) {
+                            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="editStudent('${s.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>`;
+                        }
+                        if (canDelete) {
+                            actionsHtml += `<button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>`;
+                        }
+                        if (!actionsHtml) {
+                            actionsHtml = '<span style="color: var(--text-muted);">—</span>';
+                        }
+
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td><strong>${s.student_id}</strong></td>
@@ -387,6 +405,7 @@
                             <td>${s.schools ? s.schools.school_name : 'N/A'}</td>
                             <td>${s.guardian_mobile || 'N/A'}</td>
                             <td><span class="badge badge-completed">${s.status}</span></td>
+                            <td>${actionsHtml}</td>
                         `;
                         tbody.appendChild(tr);
                     });
@@ -404,13 +423,88 @@
             pane.style.display = pane.style.display === 'none' ? 'block' : 'none';
         }
 
+        let editStudentId = null;
+
         function openEnrollmentModal() {
+            editStudentId = null;
+            document.querySelector('#enrollmentModal .card-title').textContent = 'Enroll New Student';
+            document.querySelector('#enrollmentModal button[type="submit"]').textContent = 'Submit Registration';
+            document.getElementById('enrollStudentForm').reset();
             document.getElementById('enrollmentModal').style.display = 'block';
         }
 
         function closeEnrollmentModal() {
+            editStudentId = null;
             document.getElementById('enrollmentModal').style.display = 'none';
             document.getElementById('enrollStudentForm').reset();
+        }
+
+        async function editStudent(studentId) {
+            const s = loadedStudents.find(stud => stud.id === studentId);
+            if (!s) return;
+
+            editStudentId = studentId;
+            document.querySelector('#enrollmentModal .card-title').textContent = 'Edit Student Details';
+            document.querySelector('#enrollmentModal button[type="submit"]').textContent = 'Save Updates';
+
+            document.getElementById('studName').value = s.name || '';
+            document.getElementById('studGender').value = s.gender || '';
+            document.getElementById('studDOB').value = s.date_of_birth || '';
+            
+            // Set Event
+            const ep = s.event_participants && s.event_participants[0] ? s.event_participants[0] : null;
+            const eventVal = ep && ep.events ? loadedEvents.find(e => e.name === ep.events.name)?.id : '';
+            document.getElementById('studEvent').value = eventVal || '';
+
+            // Populate Class selector
+            const studClass = document.getElementById('studClass');
+            studClass.innerHTML = '<option value="">-- Select Class --</option>';
+            if (eventVal) {
+                const selectedEvent = loadedEvents.find(e => e.id === eventVal);
+                if (selectedEvent && selectedEvent.class) {
+                    const classes = selectedEvent.class.split(', ');
+                    classes.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        opt.textContent = `Class ${c}`;
+                        studClass.appendChild(opt);
+                    });
+                }
+            }
+            studClass.value = s.class || '';
+
+            document.getElementById('studCentre').value = s.centre_id || '';
+            
+            // Re-populate schools dropdown based on centre
+            updateSchoolDropdown();
+            document.getElementById('studSchool').value = s.school_id || '';
+            
+            document.getElementById('studGuardian').value = s.guardian_name || '';
+            document.getElementById('studMobile').value = s.guardian_mobile || '';
+            document.getElementById('studLanguage').value = s.language || 'Hindi';
+
+            document.getElementById('enrollmentModal').style.display = 'block';
+        }
+
+        async function deleteStudent(studentId, name) {
+            if (!confirm(`Are you sure you want to permanently delete student "${name}"? This will cascadingly wipe all their event registrations and grading scores.`)) {
+                return;
+            }
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('students')
+                    .delete()
+                    .eq('id', studentId);
+
+                if (error) throw error;
+
+                alert("Student successfully deleted.");
+                await loadStudentsList();
+            } catch (err) {
+                console.error("Failed to delete student:", err);
+                alert("Delete failed: " + err.message);
+            }
         }
 
         async function handleSingleRegistration(e) {
@@ -446,56 +540,149 @@
                 if (stageErr) throw stageErr;
                 const stageId = firstStage.id;
 
-                // Insert Student
-                const { data: student, error: insErr } = await window.supabaseClient
-                    .from('students')
-                    .insert({
-                        student_id: studentIdCode,
-                        name,
-                        gender,
-                        date_of_birth: dob,
-                        class: targetClass,
-                        centre_id: centreId,
-                        school_id: schoolId,
-                        guardian_name: guardianName,
-                        guardian_mobile: guardianMobile,
-                        language,
-                        status: 'active'
-                    })
-                    .select()
-                    .single();
+                if (editStudentId) {
+                    // Update existing student
+                    const { error: updErr } = await window.supabaseClient
+                        .from('students')
+                        .update({
+                            name,
+                            gender,
+                            date_of_birth: dob,
+                            class: targetClass,
+                            centre_id: centreId,
+                            school_id: schoolId,
+                            guardian_name: guardianName,
+                            guardian_mobile: guardianMobile,
+                            language
+                        })
+                        .eq('id', editStudentId);
 
-                if (insErr) throw insErr;
+                    if (updErr) throw updErr;
 
-                // Also register them directly to the selected Event
-                const { data: eventPart, error: regErr } = await window.supabaseClient
-                    .from('event_participants')
-                    .insert({
-                        event_id: eventId,
-                        student_id: student.id,
-                        registration_number: `REG-2026-${suffix}`,
-                        registration_status: 'APPROVED',
-                        eligibility_status: 'ELIGIBLE',
-                        current_stage_id: stageId
-                    })
-                    .select()
-                    .single();
+                    // Update event participant registration if needed
+                    const { data: currentEp } = await window.supabaseClient
+                        .from('event_participants')
+                        .select('id, event_id')
+                        .eq('student_id', editStudentId)
+                        .maybeSingle();
 
-                if (regErr) throw regErr;
+                    if (currentEp) {
+                        if (currentEp.event_id !== eventId) {
+                            // Event changed! Clean up previous stage registration and write new ones
+                            const { error: delEp } = await window.supabaseClient
+                                .from('event_participants')
+                                .delete()
+                                .eq('id', currentEp.id);
+                            if (delEp) throw delEp;
 
-                // Bind student to Phase 1 stage_participants
-                const { error: spErr } = await window.supabaseClient
-                    .from('stage_participants')
-                    .insert({
-                        stage_id: stageId,
-                        participant_id: eventPart.id,
-                        qualification_status: 'PENDING',
-                        attendance: 'PRESENT'
-                    });
+                            // Create new event participant entry
+                            const { data: newEp, error: insEp } = await window.supabaseClient
+                                .from('event_participants')
+                                .insert({
+                                    event_id: eventId,
+                                    student_id: editStudentId,
+                                    registration_number: `REG-2026-${suffix}`,
+                                    registration_status: 'APPROVED',
+                                    eligibility_status: 'ELIGIBLE',
+                                    current_stage_id: stageId
+                                })
+                                .select()
+                                .single();
+                            if (insEp) throw insEp;
 
-                if (spErr) throw spErr;
+                            // Stage 1 bind
+                            const { error: insSp } = await window.supabaseClient
+                                .from('stage_participants')
+                                .insert({
+                                    stage_id: stageId,
+                                    participant_id: newEp.id,
+                                    qualification_status: 'PENDING',
+                                    attendance: 'PRESENT'
+                                });
+                            if (insSp) throw insSp;
+                        }
+                    } else {
+                        // Create registration if missing
+                        const { data: newEp, error: insEp } = await window.supabaseClient
+                            .from('event_participants')
+                            .insert({
+                                event_id: eventId,
+                                student_id: editStudentId,
+                                registration_number: `REG-2026-${suffix}`,
+                                registration_status: 'APPROVED',
+                                eligibility_status: 'ELIGIBLE',
+                                current_stage_id: stageId
+                            })
+                            .select()
+                            .single();
+                        if (insEp) throw insEp;
 
-                alert(`Student enrolled successfully! ID: ${studentIdCode}`);
+                        // Stage 1 bind
+                        const { error: insSp } = await window.supabaseClient
+                            .from('stage_participants')
+                            .insert({
+                                stage_id: stageId,
+                                participant_id: newEp.id,
+                                qualification_status: 'PENDING',
+                                attendance: 'PRESENT'
+                            });
+                        if (insSp) throw insSp;
+                    }
+
+                    alert("Student details updated successfully!");
+                } else {
+                    // Insert Student
+                    const { data: student, error: insErr } = await window.supabaseClient
+                        .from('students')
+                        .insert({
+                            student_id: studentIdCode,
+                            name,
+                            gender,
+                            date_of_birth: dob,
+                            class: targetClass,
+                            centre_id: centreId,
+                            school_id: schoolId,
+                            guardian_name: guardianName,
+                            guardian_mobile: guardianMobile,
+                            language,
+                            status: 'active'
+                        })
+                        .select()
+                        .single();
+
+                    if (insErr) throw insErr;
+
+                    // Also register them directly to the selected Event
+                    const { data: eventPart, error: regErr } = await window.supabaseClient
+                        .from('event_participants')
+                        .insert({
+                            event_id: eventId,
+                            student_id: student.id,
+                            registration_number: `REG-2026-${suffix}`,
+                            registration_status: 'APPROVED',
+                            eligibility_status: 'ELIGIBLE',
+                            current_stage_id: stageId
+                        })
+                        .select()
+                        .single();
+
+                    if (regErr) throw regErr;
+
+                    // Bind student to Phase 1 stage_participants
+                    const { error: spErr } = await window.supabaseClient
+                        .from('stage_participants')
+                        .insert({
+                            stage_id: stageId,
+                            participant_id: eventPart.id,
+                            qualification_status: 'PENDING',
+                            attendance: 'PRESENT'
+                        });
+
+                    if (spErr) throw spErr;
+
+                    alert(`Student enrolled successfully! ID: ${studentIdCode}`);
+                }
+
                 closeEnrollmentModal();
                 await loadStudentsList();
 
