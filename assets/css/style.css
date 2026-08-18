@@ -1,42 +1,42 @@
-/* Global Stylesheet & Core Design Tokens */
+/* Global Stylesheet & Core Design Tokens (Light Smooth Theme) */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     
-    /* Premium Slate HSL Color System */
-    --bg-base: hsl(222, 47%, 11%);
-    --bg-surface: hsl(223, 47%, 15%);
-    --bg-surface-elevated: hsl(223, 47%, 20%);
+    /* Clean Light Smooth Slate Color System */
+    --bg-base: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f1f5f9;
     
-    --text-primary: hsl(210, 40%, 98%);
-    --text-secondary: hsl(215, 20%, 75%);
-    --text-muted: hsl(215, 15%, 55%);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
     
     --primary: #2563eb;
     --primary-hover: #1d4ed8;
-    --primary-light: rgba(37, 99, 235, 0.15);
+    --primary-light: rgba(37, 99, 235, 0.08);
     
     --success: #10b981;
-    --success-light: rgba(16, 185, 129, 0.15);
+    --success-light: rgba(16, 185, 129, 0.1);
     
     --warning: #f59e0b;
-    --warning-light: rgba(245, 158, 11, 0.15);
+    --warning-light: rgba(245, 158, 11, 0.1);
     
     --danger: #ef4444;
-    --danger-light: rgba(239, 68, 68, 0.15);
+    --danger-light: rgba(239, 68, 68, 0.1);
     
-    --border-color: hsl(223, 20%, 22%);
-    --border-color-hover: hsl(223, 20%, 30%);
+    --border-color: #e2e8f0;
+    --border-color-hover: #cbd5e1;
     
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
     
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
     
     --sidebar-width: 260px;
     --header-height: 70px;
@@ -54,6 +54,7 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -98,6 +99,7 @@ input, button, select, textarea {
     width: 32px;
     height: 32px;
     background-color: var(--primary);
+    color: #ffffff;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
@@ -109,6 +111,7 @@ input, button, select, textarea {
     font-size: 1.1rem;
     font-weight: 600;
     letter-spacing: -0.02em;
+    color: var(--text-primary);
 }
 
 .sidebar-nav {
@@ -134,11 +137,12 @@ input, button, select, textarea {
 
 .nav-link:hover, .nav-link.active {
     background-color: var(--primary-light);
-    color: var(--text-primary);
+    color: var(--primary);
 }
 
 .nav-link.active {
     background-color: var(--primary);
+    color: #ffffff;
     font-weight: 600;
 }
 
@@ -166,6 +170,7 @@ input, button, select, textarea {
     justify-content: center;
     font-weight: 600;
     border: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 .user-details {
@@ -180,6 +185,7 @@ input, button, select, textarea {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--text-primary);
 }
 
 .user-role {
@@ -202,6 +208,7 @@ input, button, select, textarea {
     background-color: transparent;
     font-size: 0.9rem;
     font-weight: 500;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -228,7 +235,7 @@ input, button, select, textarea {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background-color: var(--bg-base);
+    background-color: var(--bg-surface);
     position: sticky;
     top: 0;
     z-index: 90;
@@ -238,6 +245,7 @@ input, button, select, textarea {
     font-size: 1.25rem;
     font-weight: 600;
     letter-spacing: -0.02em;
+    color: var(--text-primary);
 }
 
 .header-title p {

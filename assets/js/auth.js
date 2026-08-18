@@ -1,54 +1,59 @@
-// Authentication Management Module (Unified Users Schema)
+// Authentication Management Module (Direct Custom Database Auth)
 
 const Auth = {
     // Perform User Sign In
     async signIn(email, password) {
         if (!window.supabaseClient) throw new Error("Supabase client is not initialized.");
         
-        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-            email,
-            password
-        });
-        
+        // Query users table directly
+        const { data: users, error } = await window.supabaseClient
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .eq('password', password);
+            
         if (error) throw error;
         
-        // Fetch User details
-        await this.syncSessionProfile(data.user);
-        return data;
+        if (!users || users.length === 0) {
+            throw new Error("Invalid email or password.");
+        }
+        
+        const user = users[0];
+        
+        // Fetch roles from user_roles
+        const { data: roles, error: rolesErr } = await window.supabaseClient
+            .from('user_roles')
+            .select('role_id')
+            .eq('user_id', user.id);
+            
+        if (rolesErr) {
+            console.error("Error fetching user roles:", rolesErr);
+            user.roles = ['management'];
+        } else {
+            user.roles = roles.map(r => r.role_id);
+        }
+        
+        // Fetch centre details if present
+        if (user.centre_id) {
+            const { data: centre } = await window.supabaseClient
+                .from('centres')
+                .select('centre_name, centre_code')
+                .eq('id', user.centre_id)
+                .single();
+            user.centres = centre;
+        }
+
+        // Save session locally
+        localStorage.setItem('user_session', JSON.stringify(user));
+        localStorage.setItem('user_profile', JSON.stringify(user));
+        return user;
     },
 
     // Perform User Sign Out
     async signOut() {
-        if (!window.supabaseClient) return;
-        await window.supabaseClient.auth.signOut();
         localStorage.removeItem('user_session');
         localStorage.removeItem('user_profile');
         window.location.href = '../pages/login.html';
-    },
-
-    // Fetch User Profile details from the single public.users table
-    async syncSessionProfile(user) {
-        if (!user) return null;
-        
-        // Query public.users
-        const { data: profile, error: profileErr } = await window.supabaseClient
-            .from('users')
-            .select('*, centres(centre_name, centre_code)')
-            .eq('id', user.id)
-            .single();
-            
-        if (profileErr) {
-            console.error("Error fetching user profile:", profileErr);
-            return null;
-        }
-
-        // Map role string to roles array compatibility structure
-        profile.roles = [profile.role || 'management'];
-
-        // Save session locally
-        localStorage.setItem('user_session', JSON.stringify(user));
-        localStorage.setItem('user_profile', JSON.stringify(profile));
-        return profile;
     },
 
     // Retrieve cached Profile
@@ -74,12 +79,9 @@ const Auth = {
 
     // Secure Routes
     async checkSessionRedirect(allowedRoles = []) {
-        if (!window.supabaseClient) return;
+        const profile = this.getUserProfile();
         
-        // Verify current active session with Supabase
-        const { data: { session } } = await window.supabaseClient.auth.getSession();
-        
-        if (!session) {
+        if (!profile) {
             localStorage.removeItem('user_session');
             localStorage.removeItem('user_profile');
             // Prevent redirect loops
@@ -87,11 +89,6 @@ const Auth = {
                 window.location.href = './login.html';
             }
             return false;
-        }
-
-        let profile = this.getUserProfile();
-        if (!profile) {
-            profile = await this.syncSessionProfile(session.user);
         }
 
         // If specific roles required, assert matching permissions
