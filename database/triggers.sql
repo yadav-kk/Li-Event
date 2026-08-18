@@ -1,6 +1,6 @@
 -- Database Triggers binding function actions to operations
 
--- 1. Sync Supabase Auth User to Profiles
+-- 1. Sync Supabase Auth User to Users
 do $$
 begin
     if exists (select 1 from pg_namespace where nspname = 'auth') then
@@ -15,7 +15,7 @@ end $$;
 create trigger set_updated_at_centres before update on public.centres
     for each row execute procedure public.update_updated_at_column();
 
-create trigger set_updated_at_profiles before update on public.profiles
+create trigger set_updated_at_users before update on public.users
     for each row execute procedure public.update_updated_at_column();
 
 create trigger set_updated_at_students before update on public.students

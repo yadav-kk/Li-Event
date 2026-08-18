@@ -1,4 +1,4 @@
-// Authentication Management Module
+// Authentication Management Module (Unified Users Schema)
 
 const Auth = {
     // Perform User Sign In
@@ -12,7 +12,7 @@ const Auth = {
         
         if (error) throw error;
         
-        // Fetch User Profile details
+        // Fetch User details
         await this.syncSessionProfile(data.user);
         return data;
     },
@@ -26,34 +26,24 @@ const Auth = {
         window.location.href = '../pages/login.html';
     },
 
-    // Fetch Profile and Roles for Logged User
+    // Fetch User Profile details from the single public.users table
     async syncSessionProfile(user) {
         if (!user) return null;
         
-        // Query Profile
+        // Query public.users
         const { data: profile, error: profileErr } = await window.supabaseClient
-            .from('profiles')
+            .from('users')
             .select('*, centres(centre_name, centre_code)')
             .eq('id', user.id)
             .single();
             
         if (profileErr) {
-            console.error("Error fetching profile:", profileErr);
+            console.error("Error fetching user profile:", profileErr);
             return null;
         }
 
-        // Query Roles
-        const { data: userRoles, error: rolesErr } = await window.supabaseClient
-            .from('user_roles')
-            .select('role_id')
-            .eq('profile_id', user.id);
-
-        if (rolesErr) {
-            console.error("Error fetching user roles:", rolesErr);
-            profile.roles = ['management']; // Fallback default
-        } else {
-            profile.roles = userRoles.map(ur => ur.role_id);
-        }
+        // Map role string to roles array compatibility structure
+        profile.roles = [profile.role || 'management'];
 
         // Save session locally
         localStorage.setItem('user_session', JSON.stringify(user));

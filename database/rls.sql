@@ -5,8 +5,8 @@ create or replace function public.has_role(p_role text)
 returns boolean as $$
 begin
     return exists (
-        select 1 from public.user_roles
-        where profile_id::text = auth.uid()::text and role_id = p_role
+        select 1 from public.users
+        where id::text = auth.uid()::text and role = p_role
     );
 end;
 $$ language plpgsql security definer;
@@ -24,16 +24,14 @@ declare
     v_centre_id uuid;
 begin
     select centre_id into v_centre_id
-    from public.profiles
+    from public.users
     where id::text = auth.uid()::text;
     return v_centre_id;
 end;
 $$ language plpgsql security definer;
 
 -- 2. Enable RLS on all tables
-alter table public.roles enable row level security;
-alter table public.profiles enable row level security;
-alter table public.user_roles enable row level security;
+alter table public.users enable row level security;
 alter table public.centres enable row level security;
 alter table public.schools enable row level security;
 alter table public.batches enable row level security;
@@ -52,25 +50,14 @@ alter table public.audit_logs enable row level security;
 
 -- 3. Define Security Policies
 
--- Roles table policies
-create policy "Allow all users to select roles" on public.roles
+-- Users table policies (handles profile metadata)
+create policy "Allow users to read all user profiles" on public.users
     for select using (auth.role() = 'authenticated');
 
--- Profiles table policies
-create policy "Allow users to read all profiles" on public.profiles
-    for select using (auth.role() = 'authenticated');
-
-create policy "Allow users to update own profile" on public.profiles
+create policy "Allow users to update own profile" on public.users
     for update using (auth.uid()::text = id::text);
 
-create policy "Admins can manage profiles" on public.profiles
-    for all using (public.is_admin());
-
--- User Roles table policies
-create policy "Allow read access to user roles" on public.user_roles
-    for select using (auth.role() = 'authenticated');
-
-create policy "Admins can manage user roles" on public.user_roles
+create policy "Admins can manage user profiles" on public.users
     for all using (public.is_admin());
 
 -- Centres table policies

@@ -9,7 +9,7 @@ begin
 end;
 $$ language plpgsql;
 
--- 2. New user profile generation trigger function
+-- 2. New user profile generation trigger function (inserts directly to public.users table)
 create or replace function public.handle_new_user()
 returns trigger as $$
 declare
@@ -18,17 +18,15 @@ begin
     -- Assign default role based on metadata or fallback to 'management'
     v_role := coalesce(new.raw_user_meta_data->>'role', 'management');
     
-    insert into public.profiles (id, name, email, mobile, status)
+    insert into public.users (id, name, email, mobile, role, status)
     values (
         new.id,
         coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
         new.email,
         new.raw_user_meta_data->>'mobile',
+        v_role,
         'active'
     );
-    
-    insert into public.user_roles (profile_id, role_id)
-    values (new.id, v_role);
     
     return new;
 end;

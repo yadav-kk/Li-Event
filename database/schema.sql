@@ -3,26 +3,7 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- 1. Roles table
-create table public.roles (
-    id text primary key,
-    name text not null
-);
-
-comment on table public.roles is 'Standard user roles in the platform.';
-
--- Insert standard roles
-insert into public.roles (id, name) values
-('super_admin', 'Super Administrator'),
-('prog_admin', 'Programme/Data Administrator'),
-('centre_incharge', 'Centre In-Charge'),
-('judge', 'Judge / Assessor'),
-('academic_lead', 'Academic Lead'),
-('final_judge', 'Final Judge'),
-('coordinator', 'Coordinator / Logistics'),
-('management', 'Management');
-
--- 2. Centres table
+-- 1. Centres table
 create table public.centres (
     id uuid primary key default gen_random_uuid(),
     centre_code text unique not null,
@@ -37,30 +18,24 @@ create table public.centres (
     updated_at timestamp with time zone default now() not null
 );
 
--- 3. Profiles table (linked to Supabase auth.users)
-create table public.profiles (
+-- 2. Users table (linked to Supabase auth.users)
+create table public.users (
     id uuid primary key, -- references auth.users(id) on delete cascade
     name text not null,
     email text unique not null,
     mobile text,
+    role text default 'management' check (role in ('super_admin', 'prog_admin', 'centre_incharge', 'judge', 'academic_lead', 'final_judge', 'coordinator', 'management')),
     centre_id uuid references public.centres(id) on delete set null,
     status text default 'active' check (status in ('active', 'inactive')),
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );
 
--- Add foreign keys to centres referencing profiles
-alter table public.centres add constraint fk_centres_incharge foreign key (centre_incharge_id) references public.profiles(id) on delete set null;
-alter table public.centres add constraint fk_centres_coordinator foreign key (coordinator_id) references public.profiles(id) on delete set null;
+-- Add foreign keys to centres referencing users
+alter table public.centres add constraint fk_centres_incharge foreign key (centre_incharge_id) references public.users(id) on delete set null;
+alter table public.centres add constraint fk_centres_coordinator foreign key (coordinator_id) references public.users(id) on delete set null;
 
--- 4. User Roles mapping table
-create table public.user_roles (
-    profile_id uuid references public.profiles(id) on delete cascade not null,
-    role_id text references public.roles(id) on delete cascade not null,
-    primary key (profile_id, role_id)
-);
-
--- 5. Schools table
+-- 3. Schools table
 create table public.schools (
     id uuid primary key default gen_random_uuid(),
     school_name text not null,
@@ -73,7 +48,7 @@ create table public.schools (
     updated_at timestamp with time zone default now() not null
 );
 
--- 6. Batches table
+-- 4. Batches table
 create table public.batches (
     id uuid primary key default gen_random_uuid(),
     name text not null,
@@ -82,7 +57,7 @@ create table public.batches (
     created_at timestamp with time zone default now() not null
 );
 
--- 7. Students master table
+-- 5. Students master table
 create table public.students (
     id uuid primary key default gen_random_uuid(),
     student_id text unique not null, -- format GT-LIT-YYYY-XXXXXX
@@ -102,7 +77,7 @@ create table public.students (
     updated_at timestamp with time zone default now() not null
 );
 
--- 8. Events table
+-- 6. Events table
 create table public.events (
     id uuid primary key default gen_random_uuid(),
     name text not null,
@@ -118,12 +93,12 @@ create table public.events (
     registration_end date,
     venue text,
     status text default 'DRAFT' check (status in ('DRAFT', 'PLANNING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'IN_PROGRESS', 'RESULT_PROCESSING', 'COMPLETED', 'ARCHIVED', 'CANCELLED')),
-    event_owner uuid references public.profiles(id) on delete set null,
+    event_owner uuid references public.users(id) on delete set null,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );
 
--- 9. Event Stages table
+-- 7. Event Stages table
 create table public.event_stages (
     id uuid primary key default gen_random_uuid(),
     event_id uuid references public.events(id) on delete cascade not null,
@@ -143,7 +118,7 @@ create table public.event_stages (
     unique (event_id, sequence)
 );
 
--- 10. Event Assessments table
+-- 8. Event Assessments table
 create table public.event_assessments (
     id uuid primary key default gen_random_uuid(),
     stage_id uuid references public.event_stages(id) on delete cascade not null,
@@ -163,7 +138,7 @@ create table public.event_assessments (
     unique (stage_id, sequence)
 );
 
--- 11. Assessment Criteria table
+-- 9. Assessment Criteria table
 create table public.assessment_criteria (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid references public.event_assessments(id) on delete cascade not null,
@@ -176,7 +151,7 @@ create table public.assessment_criteria (
     unique (assessment_id, name)
 );
 
--- 12. Event Participants table
+-- 10. Event Participants table
 create table public.event_participants (
     id uuid primary key default gen_random_uuid(),
     event_id uuid references public.events(id) on delete cascade not null,
@@ -193,7 +168,7 @@ create table public.event_participants (
     unique (event_id, student_id)
 );
 
--- 13. Stage Participants table
+-- 11. Stage Participants table
 create table public.stage_participants (
     id uuid primary key default gen_random_uuid(),
     stage_id uuid references public.event_stages(id) on delete cascade not null,
@@ -209,26 +184,26 @@ create table public.stage_participants (
     unique (stage_id, participant_id)
 );
 
--- 14. Judge Assignments mapping table
+-- 12. Judge Assignments mapping table
 create table public.assessment_assignments (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid references public.event_assessments(id) on delete cascade not null,
-    judge_id uuid references public.profiles(id) on delete cascade not null,
+    judge_id uuid references public.users(id) on delete cascade not null,
     centre_id uuid references public.centres(id) on delete cascade,
     participant_id uuid references public.event_participants(id) on delete cascade,
     created_at timestamp with time zone default now() not null
 );
 
--- 15. Assessment Scores table
+-- 13. Assessment Scores table
 create table public.assessment_scores (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid references public.event_assessments(id) on delete cascade not null,
     stage_participant_id uuid references public.stage_participants(id) on delete cascade not null,
-    judge_id uuid references public.profiles(id) on delete set null not null,
+    judge_id uuid references public.users(id) on delete set null not null,
     total_score numeric(5,2) not null check (total_score >= 0),
     remarks text,
     status text default 'DRAFT' check (status in ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED', 'LOCKED')),
-    verified_by uuid references public.profiles(id) on delete set null,
+    verified_by uuid references public.users(id) on delete set null,
     verified_at timestamp with time zone,
     locked_at timestamp with time zone,
     created_at timestamp with time zone default now() not null,
@@ -236,7 +211,7 @@ create table public.assessment_scores (
     unique (assessment_id, stage_participant_id, judge_id)
 );
 
--- 16. Criteria Scores (relational normalized subscores)
+-- 14. Criteria Scores (relational normalized subscores)
 create table public.criteria_scores (
     id uuid primary key default gen_random_uuid(),
     score_id uuid references public.assessment_scores(id) on delete cascade not null,
@@ -246,7 +221,7 @@ create table public.criteria_scores (
     unique (score_id, criteria_id)
 );
 
--- 17. Evidence table for attachments
+-- 15. Evidence table for attachments
 create table public.evidence (
     id uuid primary key default gen_random_uuid(),
     event_id uuid references public.events(id) on delete cascade not null,
@@ -256,15 +231,15 @@ create table public.evidence (
     evidence_type text not null,
     file_name text not null,
     storage_path text not null,
-    uploaded_by uuid references public.profiles(id) on delete set null not null,
+    uploaded_by uuid references public.users(id) on delete set null not null,
     verification_status text default 'PENDING' check (verification_status in ('PENDING', 'VERIFIED', 'REJECTED')),
     created_at timestamp with time zone default now() not null
 );
 
--- 18. Audit logs for operations
+-- 16. Audit logs for operations
 create table public.audit_logs (
     id uuid primary key default gen_random_uuid(),
-    user_id uuid references public.profiles(id) on delete set null,
+    user_id uuid references public.users(id) on delete set null,
     action text not null, -- CREATE, UPDATE, DELETE, LOCK, UNLOCK, etc.
     entity_type text not null, -- EVENT, SCORE, STUDENT, etc.
     entity_id text,
@@ -274,13 +249,13 @@ create table public.audit_logs (
     created_at timestamp with time zone default now() not null
 );
 
--- 19. Version history for tracks
+-- 17. Version history for tracks
 create table public.version_history (
     id uuid primary key default gen_random_uuid(),
     entity_type text not null,
     entity_id uuid not null,
     version integer not null,
-    changed_by uuid references public.profiles(id) on delete set null,
+    changed_by uuid references public.users(id) on delete set null,
     changed_at timestamp with time zone default now() not null,
     change_reason text,
     old_value jsonb,
