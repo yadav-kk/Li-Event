@@ -270,13 +270,23 @@
             if (!window.supabaseClient) return;
 
             try {
-                // Fetch centres
-                const { data: cData } = await window.supabaseClient.from('centres').select('*').eq('status', 'active');
-                centres = cData || [];
+                // Fetch centres, schools, and events concurrently
+                const [centresRes, schoolsRes, eventsRes] = await Promise.all([
+                    window.supabaseClient.from('centres').select('*').eq('status', 'active'),
+                    window.supabaseClient.from('schools').select('*').eq('status', 'active'),
+                    window.supabaseClient.from('events')
+                        .select('id, name, event_code, class')
+                        .neq('status', 'ARCHIVED')
+                        .order('created_at', { ascending: false })
+                ]);
 
-                // Fetch schools
-                const { data: sData } = await window.supabaseClient.from('schools').select('*').eq('status', 'active');
-                schools = sData || [];
+                if (centresRes.error) throw centresRes.error;
+                if (schoolsRes.error) throw schoolsRes.error;
+                if (eventsRes.error) throw eventsRes.error;
+
+                centres = centresRes.data || [];
+                schools = schoolsRes.data || [];
+                loadedEvents = eventsRes.data || [];
 
                 // Populating dropdowns
                 const filterCentre = document.getElementById('filterCentre');
@@ -305,15 +315,6 @@
                     filterCentre.value = userCentre;
                     filterCentre.disabled = true;
                 }
-
-                // Fetch events
-                const { data: eData } = await window.supabaseClient
-                    .from('events')
-                    .select('id, name, event_code, class')
-                    .neq('status', 'ARCHIVED')
-                    .order('created_at', { ascending: false });
-
-                loadedEvents = eData || [];
                 const studEvent = document.getElementById('studEvent');
                 const csvEvent = document.getElementById('csvEvent');
                 studEvent.innerHTML = '<option value="">-- Select Event --</option>';

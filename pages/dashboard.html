@@ -305,13 +305,20 @@
             if (!window.supabaseClient) return;
 
             try {
-                // Fetch events
-                const { data: events, error: evErr } = await window.supabaseClient
-                    .from('events')
-                    .select('*')
-                    .order('created_at', { ascending: false });
+                // Fetch stats and lists concurrently to speed up dashboard load
+                const [eventsRes, centresRes, studentsRes, scoresRes] = await Promise.all([
+                    window.supabaseClient.from('events').select('*').order('created_at', { ascending: false }),
+                    window.supabaseClient.from('centres').select('*', { count: 'exact', head: true }),
+                    window.supabaseClient.from('students').select('*', { count: 'exact', head: true }),
+                    window.supabaseClient.from('assessment_scores').select('*', { count: 'exact', head: true }).in('status', ['VERIFIED', 'LOCKED'])
+                ]);
 
-                if (evErr) throw evErr;
+                if (eventsRes.error) throw eventsRes.error;
+
+                const events = eventsRes.data || [];
+                const centresCount = centresRes.count || 0;
+                const studentsCount = studentsRes.count || 0;
+                const completedCount = scoresRes.count || 0;
 
                 // Load to UI Table
                 const tbody = document.querySelector('#eventsTable tbody');
@@ -335,24 +342,9 @@
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No events found.</td></tr>`;
                 }
 
-                // Fetch total centres
-                const { count: centresCount } = await window.supabaseClient
-                    .from('centres')
-                    .select('*', { count: 'exact', head: true });
-                document.getElementById('totalCentresCount').textContent = centresCount || 0;
-
-                // Fetch total students
-                const { count: studentsCount } = await window.supabaseClient
-                    .from('students')
-                    .select('*', { count: 'exact', head: true });
-                document.getElementById('totalStudentsCount').textContent = studentsCount || 0;
-
-                // Fetch total completed scorecards (verified/locked)
-                const { count: completedCount } = await window.supabaseClient
-                    .from('assessment_scores')
-                    .select('*', { count: 'exact', head: true })
-                    .in('status', ['VERIFIED', 'LOCKED']);
-                document.getElementById('completedAssessmentsCount').textContent = completedCount || 0;
+                document.getElementById('totalCentresCount').textContent = centresCount;
+                document.getElementById('totalStudentsCount').textContent = studentsCount;
+                document.getElementById('completedAssessmentsCount').textContent = completedCount;
 
             } catch (err) {
                 console.error("Error loading admin stats:", err);
@@ -364,14 +356,21 @@
             if (!window.supabaseClient || !centreId) return;
 
             try {
-                // Total students registered in this centre
-                const { data: students, error: studErr } = await window.supabaseClient
-                    .from('students')
-                    .select('*, schools(school_name)')
-                    .eq('centre_id', centreId)
-                    .order('created_at', { ascending: false });
+                // Fetch centre details and stats in parallel
+                const [studentsRes, evidenceRes, qualifiedRes, alignedEventsRes] = await Promise.all([
+                    window.supabaseClient.from('students').select('*, schools(school_name)').eq('centre_id', centreId).order('created_at', { ascending: false }),
+                    window.supabaseClient.from('evidence').select('*', { count: 'exact', head: true }).eq('centre_id', centreId),
+                    window.supabaseClient.from('stage_participants').select('*, participant_id!inner(student_id!inner(centre_id))', { count: 'exact', head: true }).eq('participant_id.student_id.centre_id', centreId).eq('qualification_status', 'QUALIFIED'),
+                    window.supabaseClient.from('event_centres').select('events(*)').eq('centre_id', centreId)
+                ]);
 
-                if (studErr) throw studErr;
+                if (studentsRes.error) throw studentsRes.error;
+                if (alignedEventsRes.error) throw alignedEventsRes.error;
+
+                const students = studentsRes.data || [];
+                const evCount = evidenceRes.count || 0;
+                const qCount = qualifiedRes.count || 0;
+                const alignedEvents = alignedEventsRes.data || [];
 
                 document.getElementById('centreStudentsCount').textContent = students.length;
 
@@ -394,29 +393,10 @@
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No students registered yet.</td></tr>`;
                 }
 
-                // Total evidence files uploaded by this centre
-                const { count: evCount } = await window.supabaseClient
-                    .from('evidence')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('centre_id', centreId);
-                document.getElementById('evidenceCount').textContent = evCount || 0;
-
-                // Total qualified students for Stage 2 from this centre
-                const { count: qCount } = await window.supabaseClient
-                    .from('stage_participants')
-                    .select('*, participant_id!inner(student_id!inner(centre_id))', { count: 'exact', head: true })
-                    .eq('participant_id.student_id.centre_id', centreId)
-                    .eq('qualification_status', 'QUALIFIED');
-                document.getElementById('qualifiedCount').textContent = qCount || 0;
+                document.getElementById('evidenceCount').textContent = evCount;
+                document.getElementById('qualifiedCount').textContent = qCount;
 
                 // Load aligned events
-                const { data: alignedEvents, error: aeErr } = await window.supabaseClient
-                    .from('event_centres')
-                    .select('events(*)')
-                    .eq('centre_id', centreId);
-
-                if (aeErr) throw aeErr;
-
                 const tbodyEvents = document.querySelector('#centreEventsTable tbody');
                 tbodyEvents.innerHTML = '';
 
