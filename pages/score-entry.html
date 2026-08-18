@@ -31,7 +31,7 @@
                 <a href="students.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator"><span>Participants</span></a>
                 <a href="centres.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, coordinator, management"><span>Centres</span></a>
                 <a href="users.html" class="nav-link" data-allowed-roles="super_admin, prog_admin"><span>Users</span></a>
-                <a href="judge-dashboard.html" class="nav-link active" data-allowed-roles="judge, final_judge, super_admin"><span>Judge Panel</span></a>
+                <a href="judge-dashboard.html" class="nav-link active" data-allowed-roles="judge, final_judge, super_admin, prog_admin"><span>Judge Panel</span></a>
                 <a href="results.html" class="nav-link" data-allowed-roles="all"><span>Results & Rankings</span></a>
                 <a href="evidence.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, centre_incharge"><span>Evidence Upload</span></a>
                 <a href="reports.html" class="nav-link" data-allowed-roles="super_admin, prog_admin, management"><span>Reports</span></a>
@@ -104,7 +104,7 @@
         let scoreRecords = {}; // mapping: stage_participant_id -> { score_id, total, remarks, criteria: { crit_id: val } }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin']);
+            const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin', 'prog_admin']);
             if (!isSessionValid) return;
 
             document.getElementById('logoutBtn').addEventListener('click', () => {
