@@ -168,11 +168,15 @@
                                         <option value="">Choose Stage...</option>
                                     </select>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">Assigned Centre</label>
-                                    <select id="assignCentre" class="form-control" required>
-                                        <option value="">Choose Centre...</option>
-                                    </select>
+                                <div class="form-group" style="position: relative;">
+                                    <label class="form-label">Assigned Centre(s)</label>
+                                    <div id="assignCentreMultiSelect" class="form-control" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleAssignCentreMultiSelect(event)">
+                                        <span id="assignCentreMultiSelectPlaceholder" style="color: var(--text-secondary);">Select Centres...</span>
+                                        <span>▼</span>
+                                    </div>
+                                    <div id="assignCentreMultiOptionsList" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; z-index: 1000; max-height: 200px; overflow-y: auto; padding: 12px; flex-direction: column; gap: 8px; margin-top: 4px;">
+                                        <!-- Checkboxes populated dynamically -->
+                                    </div>
                                 </div>
                                 <button type="submit" class="btn btn-primary" style="width: 100%;">Grant Grading Access</button>
                             </form>
@@ -234,9 +238,14 @@
 
             document.addEventListener('click', () => {
                 optionsList.style.display = 'none';
+                document.getElementById('assignCentreMultiOptionsList').style.display = 'none';
             });
 
             optionsList.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            document.getElementById('assignCentreMultiOptionsList').addEventListener('click', (e) => {
                 e.stopPropagation();
             });
 
@@ -270,21 +279,15 @@
                     .order('centre_code');
 
                 const usrCentreSelect = document.getElementById('usrCentre');
-                const assignCentreSelect = document.getElementById('assignCentre');
 
                 centres.forEach(c => {
                     const opt1 = document.createElement('option');
                     opt1.value = c.id;
                     opt1.textContent = `${c.centre_code} - ${c.centre_name}`;
                     usrCentreSelect.appendChild(opt1);
-
-                    const opt2 = document.createElement('option');
-                    opt2.value = c.id;
-                    opt2.textContent = `${c.centre_code} - ${c.centre_name}`;
-                    assignCentreSelect.appendChild(opt2);
                 });
 
-                // Populate multi-select checkbox options
+                // Populate multi-select checkbox options for Users form
                 const multiList = document.getElementById('centreMultiOptionsList');
                 multiList.innerHTML = '';
                 centres.forEach(c => {
@@ -300,7 +303,7 @@
                     multiList.appendChild(label);
                 });
 
-                // Update display text when selection changes
+                // Update display text when selection changes for Users form
                 multiList.addEventListener('change', () => {
                     const selected = Array.from(document.querySelectorAll('.usr-centre-cb:checked')).map(el => el.getAttribute('data-name'));
                     const placeholder = document.getElementById('centreMultiSelectPlaceholder');
@@ -313,9 +316,44 @@
                     }
                 });
 
+                // Populate multi-select checkbox options for Judge Event Access form
+                const assignMultiList = document.getElementById('assignCentreMultiOptionsList');
+                assignMultiList.innerHTML = '';
+                centres.forEach(c => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '8px';
+                    label.style.cursor = 'pointer';
+                    label.innerHTML = `
+                        <input type="checkbox" class="assign-centre-cb" value="${c.id}" data-name="${c.centre_code}">
+                        <span>${c.centre_code} - ${c.centre_name}</span>
+                    `;
+                    assignMultiList.appendChild(label);
+                });
+
+                // Update display text when selection changes for Judge Event Access form
+                assignMultiList.addEventListener('change', () => {
+                    const selected = Array.from(document.querySelectorAll('.assign-centre-cb:checked')).map(el => el.getAttribute('data-name'));
+                    const placeholder = document.getElementById('assignCentreMultiSelectPlaceholder');
+                    if (selected.length === 0) {
+                        placeholder.textContent = 'Select Centres...';
+                        placeholder.style.color = 'var(--text-secondary)';
+                    } else {
+                        placeholder.textContent = selected.join(', ');
+                        placeholder.style.color = 'var(--text-primary)';
+                    }
+                });
+
             } catch (err) {
                 console.error("Error loading centres dropdowns:", err);
             }
+        }
+
+        function toggleAssignCentreMultiSelect(event) {
+            event.stopPropagation();
+            const list = document.getElementById('assignCentreMultiOptionsList');
+            list.style.display = list.style.display === 'none' || list.style.display === '' ? 'flex' : 'none';
         }
 
         async function loadAssessmentsDropdown() {
@@ -693,21 +731,36 @@
 
             const judgeId = document.getElementById('assignUser').value;
             const assessmentId = document.getElementById('assignAssessment').value;
-            const centreId = document.getElementById('assignCentre').value;
+            const selectedCentres = Array.from(document.querySelectorAll('.assign-centre-cb:checked')).map(el => el.value);
+
+            if (selectedCentres.length === 0) {
+                alert("Please select at least one centre to assign grading access.");
+                return;
+            }
 
             try {
-                const { error: insErr } = await window.supabaseClient
-                    .from('assessment_assignments')
-                    .insert({
-                        judge_id: judgeId,
-                        assessment_id: assessmentId,
-                        centre_id: centreId
-                    });
+                // Insert one row per selected centre
+                for (const cId of selectedCentres) {
+                    const { error: insErr } = await window.supabaseClient
+                        .from('assessment_assignments')
+                        .insert({
+                            judge_id: judgeId,
+                            assessment_id: assessmentId,
+                            centre_id: cId
+                        });
 
-                if (insErr) throw insErr;
+                    if (insErr) throw insErr;
+                }
 
-                alert('Grading access permission granted successfully!');
-                document.getElementById('assignAccessForm').reset();
+                alert('Grading access permissions granted successfully!');
+                
+                // Reset form fields
+                document.getElementById('assignUser').value = '';
+                document.getElementById('assignAssessment').value = '';
+                document.querySelectorAll('.assign-centre-cb').forEach(cb => cb.checked = false);
+                document.getElementById('assignCentreMultiSelectPlaceholder').textContent = 'Select Centres...';
+                document.getElementById('assignCentreMultiSelectPlaceholder').style.color = 'var(--text-secondary)';
+                
                 await loadAccessAssignments();
 
             } catch (err) {

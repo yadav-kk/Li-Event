@@ -167,6 +167,7 @@
                 const profile = window.Auth.getUserProfile();
                 const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
                 const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
+                const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
 
                 let allowedCentreIds = [];
                 if (isPDOrCoord) {
@@ -175,6 +176,14 @@
                         .select('centre_id')
                         .eq('user_id', profile.id);
                     allowedCentreIds = ucData ? ucData.map(uc => uc.centre_id) : [];
+                } else if (isJudge) {
+                    // Fetch assigned centres from assessment_assignments for this specific assessment
+                    const { data: assignData } = await window.supabaseClient
+                        .from('assessment_assignments')
+                        .select('centre_id')
+                        .eq('judge_id', profile.id)
+                        .eq('assessment_id', assessmentId);
+                    allowedCentreIds = assignData ? assignData.map(a => a.centre_id).filter(id => id) : [];
                 }
 
                 let query = window.supabaseClient
@@ -182,7 +191,7 @@
                     .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id))')
                     .eq('stage_id', assess.stage_id);
 
-                if (isPDOrCoord) {
+                if (isPDOrCoord || (isJudge && allowedCentreIds.length > 0)) {
                     if (allowedCentreIds.length > 0) {
                         query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
                     } else {
