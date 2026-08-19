@@ -249,6 +249,9 @@
             const isSessionValid = await window.Auth.checkSessionRedirect();
             if (!isSessionValid) return;
 
+            // Sync event statuses based on time bounds
+            await window.syncEventStatuses();
+
             const profile = window.Auth.getUserProfile();
             if (!profile) return;
 
@@ -424,8 +427,9 @@
                 // We'll query event_assessments details for the default active event stages.
                 const { data: assessments, error: asErr } = await window.supabaseClient
                     .from('event_assessments')
-                    .select('*, stage_id!inner(name, event_id!inner(name))')
+                    .select('*, stage_id!inner(name, status, event_id!inner(name, status))')
                     .eq('status', 'ACTIVE')
+                    .eq('stage_id.event_id.status', 'IN_PROGRESS')
                     .order('sequence', { ascending: true });
 
                 if (asErr) throw asErr;

@@ -84,6 +84,9 @@
             const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin', 'prog_admin', 'project_director', 'ceo']);
             if (!isSessionValid) return;
 
+            // Sync event statuses based on time bounds before loading data
+            await window.syncEventStatuses();
+
             document.getElementById('logoutBtn').addEventListener('click', () => {
                 window.Auth.signOut();
             });
@@ -98,8 +101,9 @@
             try {
                 const { data: assessments, error: asErr } = await window.supabaseClient
                     .from('event_assessments')
-                    .select('*, stage_id!inner(name, status, event_id!inner(name))')
+                    .select('*, stage_id!inner(name, status, event_id!inner(name, status))')
                     .eq('status', 'ACTIVE')
+                    .eq('stage_id.event_id.status', 'IN_PROGRESS')
                     .order('sequence', { ascending: true });
 
                 if (asErr) throw asErr;

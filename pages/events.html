@@ -124,6 +124,9 @@
             const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'academic_lead', 'coordinator', 'management', 'project_director', 'ceo']);
             if (!isSessionValid) return;
 
+            // Sync event statuses based on time bounds before loading data
+            await window.syncEventStatuses();
+
             document.getElementById('logoutBtn').addEventListener('click', () => {
                 window.Auth.signOut();
             });
