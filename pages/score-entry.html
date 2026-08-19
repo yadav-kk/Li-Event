@@ -141,6 +141,72 @@
                 document.getElementById('assessmentHeader').textContent = `Score Entry: ${assess.name}`;
                 document.getElementById('assessmentSub').textContent = `Event: ${assess.stage_id.event_id.name} | Stage: ${assess.stage_id.name} | Max Marks: ${assess.max_marks}`;
 
+                // Check if current date is within assessment date range
+                const now = new Date();
+                const start = assess.start_datetime ? new Date(assess.start_datetime) : null;
+                const end = assess.end_datetime ? new Date(assess.end_datetime) : null;
+                
+                let isOutsideDateWindow = false;
+                let dateWarningText = '';
+                
+                if (start && now < start) {
+                    isOutsideDateWindow = true;
+                    dateWarningText = `This assessment is Scheduled to open on ${start.toLocaleString()}.`;
+                } else if (end && now > end) {
+                    isOutsideDateWindow = true;
+                    dateWarningText = `This assessment ended on ${end.toLocaleString()}.`;
+                }
+
+                if (isOutsideDateWindow) {
+                    // Check if current user is an Admin, CEO, or Event Lead
+                    const userProfile = window.Auth.getUserProfile();
+                    const isAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
+                    
+                    let isLead = false;
+                    const { count: leadCount } = await window.supabaseClient
+                        .from('event_leads')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('user_id', userProfile.id)
+                        .eq('event_id', assess.stage_id.event_id.id);
+                    isLead = leadCount > 0;
+
+                    if (isAdmin || isLead) {
+                        // Display admin override warning banner
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-warning';
+                        alertDiv.style.marginBottom = '20px';
+                        alertDiv.style.background = '#fef3c7';
+                        alertDiv.style.border = '1px solid #f59e0b';
+                        alertDiv.style.color = '#b45309';
+                        alertDiv.style.padding = '12px 16px';
+                        alertDiv.style.borderRadius = '8px';
+                        alertDiv.innerHTML = `⚠️ <strong>Admin Override Mode</strong>: ${dateWarningText} You have access to edit scores.`;
+                        document.querySelector('.content-body').insertBefore(alertDiv, document.querySelector('.content-body').firstChild);
+                    } else {
+                        // Display locked banner
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-danger';
+                        alertDiv.style.marginBottom = '20px';
+                        alertDiv.style.background = '#fee2e2';
+                        alertDiv.style.border = '1px solid #ef4444';
+                        alertDiv.style.color = '#b91c1c';
+                        alertDiv.style.padding = '12px 16px';
+                        alertDiv.style.borderRadius = '8px';
+                        alertDiv.innerHTML = `⚠️ <strong>Grading Closed</strong>: ${dateWarningText} The score sheet is in read-only mode.`;
+                        document.querySelector('.content-body').insertBefore(alertDiv, document.querySelector('.content-body').firstChild);
+                        
+                        // Disable all input fields and actions
+                        setTimeout(() => {
+                            document.querySelectorAll('.matrix-input, .remarks-input, button').forEach(el => {
+                                if (!el.classList.contains('logout-btn') && el.id !== 'logoutBtn') {
+                                    el.disabled = true;
+                                    el.style.cursor = 'not-allowed';
+                                }
+                            });
+                        }, 500);
+                    }
+                }
+
                 // 2. Fetch assessment criteria params
                 const { data: criteria, error: critErr } = await window.supabaseClient
                     .from('assessment_criteria')
@@ -165,9 +231,23 @@
                 // 3. Fetch Stage Participants
                 // Filter participants dynamically by the judge's assigned centre(s)
                 const profile = window.Auth.getUserProfile();
-                const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
+                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
                 const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
                 const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
+
+                // Query if user is an event lead
+                let isEventLead = false;
+                if (profile) {
+                    const { count: leadCount } = await window.supabaseClient
+                        .from('event_leads')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('user_id', profile.id)
+                        .eq('event_id', assess.stage_id.event_id.id);
+                    isEventLead = leadCount > 0;
+                }
+
+                // Super Event Scope = Admins, CEO, Mail Judge, or designated Event Leads
+                const isSuperEventScope = isSuperRole || (profile && profile.email === 'judge@test.com') || isEventLead;
 
                 let allowedCentreIds = [];
                 if (isPDOrCoord) {
@@ -191,15 +271,17 @@
                     .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id))')
                     .eq('stage_id', assess.stage_id);
 
-                if (isPDOrCoord || (isJudge && allowedCentreIds.length > 0)) {
-                    if (allowedCentreIds.length > 0) {
-                        query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
-                    } else {
-                        // Return empty if no centres mapped
-                        query = query.eq('participant_id.student_id.centre_id', '00000000-0000-0000-0000-000000000000');
+                if (!isSuperEventScope) {
+                    if (isPDOrCoord || (isJudge && allowedCentreIds.length > 0)) {
+                        if (allowedCentreIds.length > 0) {
+                            query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
+                        } else {
+                            // Return empty if no centres mapped
+                            query = query.eq('participant_id.student_id.centre_id', '00000000-0000-0000-0000-000000000000');
+                        }
+                    } else if (profile.centre_id) {
+                        query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
                     }
-                } else if (profile.centre_id && !isSuper) {
-                    query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
                 }
 
                 const { data: spList, error: spErr } = await query;

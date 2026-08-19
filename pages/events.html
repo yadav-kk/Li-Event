@@ -56,6 +56,45 @@
 
             <section class="content-body">
                 
+                <!-- Event Leads Management card -->
+                <div class="card" id="eventLeadsModal" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
+                    <div class="card-header">
+                        <span class="card-title" id="eventLeadsTitle">Manage Event Leads</span>
+                    </div>
+                    <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                        
+                        <!-- Add Event Lead Inline Form -->
+                        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                            <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 0;">
+                                <label class="form-label" for="leadUserSelect">Select Staff / Coordinator / Judge</label>
+                                <select class="form-control" id="leadUserSelect">
+                                    <option value="">Choose User...</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="addEventLead()" style="height: 42px;">Add Event Lead</button>
+                            <button class="btn btn-secondary" onclick="closeLeadsModal()" style="height: 42px;">Close Panel</button>
+                        </div>
+
+                        <!-- Current Mapped Event Leads Table -->
+                        <div class="table-container" style="border: 1px solid var(--border-color); border-radius: 8px; margin-top: 12px;">
+                            <table class="data-table" id="eventLeadsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Primary Role</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No event leads assigned.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="table-container" style="border: none; margin-bottom: 0;">
                         <table class="data-table" id="allEventsTable">
@@ -134,6 +173,7 @@
                                 <td>
                                     ${editBtn}
                                     <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="manageEventLeads('${e.id}', '${e.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Leads</button>
                                     <button class="btn btn-danger btn-sm" onclick="archiveEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Archive</button>
                                 </td>
                             `;
@@ -301,6 +341,158 @@
             } catch (err) {
                 console.error("Archive failed:", err);
             }
+        }
+
+        let activeLeadsEventId = null;
+
+        async function manageEventLeads(eventId, eventName) {
+            activeLeadsEventId = eventId;
+            document.getElementById('eventLeadsTitle').textContent = `Manage Event Leads: ${eventName}`;
+            document.getElementById('eventLeadsModal').style.display = 'block';
+            
+            // Scroll to the panel
+            document.getElementById('eventLeadsModal').scrollIntoView({ behavior: 'smooth' });
+
+            await loadLeadsUserDropdown();
+            await loadEventLeadsTable();
+        }
+
+        function closeLeadsModal() {
+            activeLeadsEventId = null;
+            document.getElementById('eventLeadsModal').style.display = 'none';
+        }
+
+        async function loadLeadsUserDropdown() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: users, error } = await window.supabaseClient
+                    .from('users')
+                    .select('*, user_roles(role_id)')
+                    .order('name');
+
+                if (error) throw error;
+
+                const select = document.getElementById('leadUserSelect');
+                select.innerHTML = '<option value="">Choose User...</option>';
+
+                // Only show users who are not pure super_admin, prog_admin or ceo
+                users.forEach(u => {
+                    const roles = u.user_roles ? u.user_roles.map(r => r.role_id) : [];
+                    const isGlobalAdmin = roles.includes('super_admin') || roles.includes('prog_admin') || roles.includes('ceo');
+                    
+                    if (!isGlobalAdmin) {
+                        const opt = document.createElement('option');
+                        opt.value = u.id;
+                        const roleLabel = roles.join(', ') || 'no role';
+                        opt.textContent = `${u.name} (${u.email}) [${roleLabel}]`;
+                        select.appendChild(opt);
+                    }
+                });
+            } catch (err) {
+                console.error("Error loading leads user dropdown:", err);
+            }
+        }
+
+        async function loadEventLeadsTable() {
+            if (!window.supabaseClient || !activeLeadsEventId) return;
+            try {
+                const { data: leads, error } = await window.supabaseClient
+                    .from('event_leads')
+                    .select('*, users(name, email, user_roles(role_id))')
+                    .eq('event_id', activeLeadsEventId);
+
+                if (error) throw error;
+
+                const tbody = document.querySelector('#eventLeadsTable tbody');
+                tbody.innerHTML = '';
+
+                if (!leads || leads.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No event leads assigned.</td></tr>`;
+                    return;
+                }
+
+                leads.forEach(l => {
+                    if (!l.users) return;
+                    const uName = l.users.name || 'Unknown';
+                    const uEmail = l.users.email || '';
+                    const roles = l.users.user_roles ? l.users.user_roles.map(r => r.role_id).join(', ') : 'None';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(uName)}</strong></td>
+                        <td>${escapeHTML(uEmail)}</td>
+                        <td><span class="badge badge-active">${escapeHTML(roles)}</span></td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="removeEventLead('${l.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Remove</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error("Error loading event leads table:", err);
+            }
+        }
+
+        async function addEventLead() {
+            if (!window.supabaseClient || !activeLeadsEventId) return;
+            const userId = document.getElementById('leadUserSelect').value;
+            if (!userId) {
+                alert("Please select a user to add as event lead.");
+                return;
+            }
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('event_leads')
+                    .insert({
+                        event_id: activeLeadsEventId,
+                        user_id: userId
+                    });
+
+                if (error) {
+                    if (error.code === '23505') {
+                        alert("This user is already assigned as a lead for this event.");
+                        return;
+                    }
+                    throw error;
+                }
+
+                alert("Event lead added successfully!");
+                document.getElementById('leadUserSelect').value = '';
+                await loadEventLeadsTable();
+
+            } catch (err) {
+                console.error("Error adding event lead:", err);
+                alert("Error adding event lead: " + err.message);
+            }
+        }
+
+        async function removeEventLead(leadId) {
+            if (!confirm("Are you sure you want to remove this user as event lead?")) return;
+            if (!window.supabaseClient) return;
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('event_leads')
+                    .delete()
+                    .eq('id', leadId);
+
+                if (error) throw error;
+
+                alert("Event lead removed.");
+                await loadEventLeadsTable();
+            } catch (err) {
+                console.error("Error removing event lead:", err);
+                alert("Error removing event lead: " + err.message);
+            }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
         }
     </script>
 </body>

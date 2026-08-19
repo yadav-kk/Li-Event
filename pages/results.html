@@ -69,7 +69,7 @@
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 12px;" data-allowed-roles="super_admin, prog_admin">
+                    <div id="rulesControlBlock" style="display: flex; gap: 12px;" data-allowed-roles="super_admin, prog_admin, project_director, ceo">
                         <button class="btn btn-secondary" onclick="executeAdvancementRules()">Calculate Rank & Qualify</button>
                         <button class="btn btn-primary" id="confirmFinalistsBtn" onclick="confirmAndPromoteFinalists()">Confirm & Promote to Next Stage</button>
                     </div>
@@ -115,6 +115,7 @@
         let assessmentList = [];
         let stageParticipants = [];
         let centresList = [];
+        let isUserEventLead = false;
 
         document.addEventListener('DOMContentLoaded', async () => {
             const isSessionValid = await window.Auth.checkSessionRedirect();
@@ -178,6 +179,33 @@
             if (!currentStageId) return;
 
             try {
+                // Query event_leads to see if user is a lead for this event
+                isUserEventLead = false;
+                const { data: stageRec } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('event_id')
+                    .eq('id', currentStageId)
+                    .single();
+
+                if (stageRec) {
+                    const profile = window.Auth.getUserProfile();
+                    if (profile) {
+                        const { count: leadCount } = await window.supabaseClient
+                            .from('event_leads')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('user_id', profile.id)
+                            .eq('event_id', stageRec.event_id);
+                        isUserEventLead = leadCount > 0;
+                    }
+                }
+
+                // Update visibility of the rank calculation block
+                const isAuthUser = window.Auth.hasRole(['super_admin', 'prog_admin', 'project_director', 'ceo']) || isUserEventLead;
+                const rulesControl = document.getElementById('rulesControlBlock');
+                if (rulesControl) {
+                    rulesControl.style.display = isAuthUser ? 'flex' : 'none';
+                }
+
                 // 1. Fetch assessments for this stage
                 const { data: assessments, error: assErr } = await window.supabaseClient
                     .from('event_assessments')
@@ -304,7 +332,7 @@
                 // Display Total and Badge Status
                 const badgeClass = sp.qualification_status.toLowerCase();
 
-                const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'project_director', 'ceo']);
+                const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'project_director', 'ceo']) || isUserEventLead;
                 let actionsHtml = '—';
                 if (isPDOrAdmin && sp.qualification_status !== 'DISQUALIFIED') {
                     actionsHtml = `<button class="btn btn-danger btn-sm" onclick="disqualifyParticipant('${sp.id}', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Drop</button>`;

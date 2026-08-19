@@ -108,7 +108,34 @@
                 tbody.innerHTML = '';
 
                 if (assessments && assessments.length > 0) {
+                    const now = new Date();
                     assessments.forEach(a => {
+                        const start = a.start_datetime ? new Date(a.start_datetime) : null;
+                        const end = a.end_datetime ? new Date(a.end_datetime) : null;
+                        
+                        let badgeColor = 'completed'; // green
+                        let statusText = 'Open';
+                        let isBtnDisabled = false;
+                        
+                        if (start && now < start) {
+                            badgeColor = 'draft'; // gray
+                            statusText = `Upcoming (Opens ${start.toLocaleString()})`;
+                            isBtnDisabled = true;
+                        } else if (end && now > end) {
+                            badgeColor = 'danger'; // red
+                            statusText = `Closed (Ended ${end.toLocaleString()})`;
+                            isBtnDisabled = true;
+                        } else {
+                            statusText = `Open (Closes ${end ? end.toLocaleString() : 'N/A'})`;
+                        }
+
+                        let actionHtml = '';
+                        if (isBtnDisabled) {
+                            actionHtml = `<button class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 0.8rem; opacity: 0.6; cursor: not-allowed;" disabled>Enter Scores</button>`;
+                        } else {
+                            actionHtml = `<a href="score-entry.html?assessment_id=${a.id}" class="btn btn-primary btn-sm" style="padding: 6px 12px; font-size: 0.8rem;">Enter Scores</a>`;
+                        }
+
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td>
@@ -117,10 +144,8 @@
                             </td>
                             <td>${a.name}</td>
                             <td>${a.max_marks}</td>
-                            <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
-                            <td>
-                                <a href="score-entry.html?assessment_id=${a.id}" class="btn btn-primary btn-sm" style="padding: 6px 12px; font-size: 0.8rem;">Enter Scores</a>
-                            </td>
+                            <td><span class="badge badge-${badgeColor}">${statusText}</span></td>
+                            <td>${actionHtml}</td>
                         `;
                         tbody.appendChild(tr);
                     });
