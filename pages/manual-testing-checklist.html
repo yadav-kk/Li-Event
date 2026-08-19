@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Testing Checklist - Literacy India Event Portal</title>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --text: #1f2937;
+            --border: #e5e7eb;
+            --bg-light: #f9fafb;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: var(--text);
+            line-height: 1.5;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #6b7280;
+            font-size: 0.95rem;
+            margin-bottom: 30px;
+        }
+        .section-title {
+            background-color: var(--bg-light);
+            border-left: 4px solid var(--primary);
+            padding: 8px 12px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+        }
+        .col-check {
+            width: 40px;
+            text-align: center;
+        }
+        .col-step {
+            width: 50px;
+            font-weight: bold;
+            color: #4b5563;
+        }
+        .checkbox-box {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 1.5px solid #9ca3af;
+            border-radius: 3px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-admin { background: #dbeafe; color: #1e40af; }
+        .badge-incharge { background: #dcfce7; color: #15803d; }
+        .badge-judge { background: #fef3c7; color: #b45309; }
+        .badge-lead { background: #f3e8ff; color: #6b21a8; }
+        
+        @media print {
+            body {
+                padding: 0;
+                font-size: 12pt;
+            }
+            .no-print {
+                display: none;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" class="no-print">
+        <a href="dashboard.html" style="text-decoration: none; color: var(--primary); font-weight: bold;">← Back to Dashboard</a>
+        <button onclick="window.print()" style="padding: 8px 16px; background-color: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Print to PDF</button>
+    </div>
+
+    <h1>System Testing & Verification Checklist</h1>
+    <div class="subtitle">Complete step-by-step testing manual for the Literacy India Event & Competition Management System.</div>
+
+    <!-- Section 1: Super Admin -->
+    <div class="section-title">1. Super Admin & Program Admin Roles <span class="badge badge-admin">super_admin</span> <span class="badge badge-admin">prog_admin</span></div>
+    <table>
+        <thead>
+            <tr>
+                <th class="col-check">Done</th>
+                <th class="col-step">Step</th>
+                <th>Test Instructions</th>
+                <th>Expected Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>1.1</td>
+                <td>Log in as <strong>admin@test.com</strong> (Password: <code>password123</code>). Open the <strong>Events</strong> page.</td>
+                <td>Main dashboard displays with admin counts. Side navigation shows all management tabs.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>1.2</td>
+                <td>Click <strong>Create Event</strong>. Set future registration dates (e.g. tomorrow) and save.</td>
+                <td>Event successfully saved in <strong>PLANNING</strong> status. No judge panel links are generated.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>1.3</td>
+                <td>Edit the event dates so registration starts today at 5:00 AM. Refresh dashboard.</td>
+                <td>Sync engine automatically transitions status from <code>PLANNING</code> to <strong><code>REGISTRATION</code></strong>.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>1.4</td>
+                <td>Create/Clone an event. Click on <strong>Leads</strong> button in the actions column. Mappings modal opens. Add a Coordinator as Lead.</td>
+                <td>Lead is successfully assigned. Leads mapping updates in database without errors.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>1.5</td>
+                <td>Archive an active event.</td>
+                <td>Status changes to <strong><code>ARCHIVED</code></strong>. "Edit" & "Leads" buttons hide. <strong>Unarchive</strong> button appears.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>1.6</td>
+                <td>Click <strong>Unarchive</strong> on the archived event.</td>
+                <td>Event transitions back to its correct status (e.g. <code>REGISTRATION</code> or <code>ASSESSMENT</code>) based on today's dates.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Section 2: Centre In-charge -->
+    <div class="section-title page-break">2. Centre In-Charge Role <span class="badge badge-incharge">centre_incharge</span></div>
+    <table>
+        <thead>
+            <tr>
+                <th class="col-check">Done</th>
+                <th class="col-step">Step</th>
+                <th>Test Instructions</th>
+                <th>Expected Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>2.1</td>
+                <td>Log in as a Centre In-charge (e.g. <strong>arup.mahato@literacyindia.org</strong>, Password: <code>password123</code>).</td>
+                <td>Dashboard loads showing "My Registered Participants" and "Events Aligned with My Centre".</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>2.2</td>
+                <td>Go to <strong>Participants</strong> registry. Download the sample CSV.</td>
+                <td>A CSV template downloads containing columns: <em>Participant Name, Gender, Centre Code, Program Code, Guardian Name, Guardian Mobile, Language</em> (No "Class").</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>2.3</td>
+                <td>Fill in 2 student rows using the downloaded template, select the active event, and click <strong>Bulk Import CSV</strong>.</td>
+                <td>Preview grid shows parsed columns. On Save, students are registered. Under-the-hood class column default constraints set to <code>N/A</code>.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>2.4</td>
+                <td>Go to <strong>Evidence Upload</strong>. Upload a PDF/Image scorecard for a participant.</td>
+                <td>File successfully registers in Supabase Storage. Link shows up in the uploads table.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Section 3: Judges -->
+    <div class="section-title page-break">3. Judge / Assessor Role <span class="badge badge-judge">judge</span></div>
+    <table>
+        <thead>
+            <tr>
+                <th class="col-check">Done</th>
+                <th class="col-step">Step</th>
+                <th>Test Instructions</th>
+                <th>Expected Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>3.1</td>
+                <td>Log in as the Mail Judge (<strong>judge@test.com</strong>, Password: <code>password123</code>). Open the <strong>Judge Panel</strong>.</td>
+                <td>All active assessments belonging to events in <strong><code>ASSESSMENT</code></strong> phase appear. Registration/Practice events are hidden.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>3.2</td>
+                <td>Click on an assessment that has expired/closed.</td>
+                <td>Warning banner displays: <em>"This assessment ended..."</em>. Input cells are locked/read-only. No scores can be updated.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>3.3</td>
+                <td>Log in as a Super Admin. Go to the same expired assessment sheet.</td>
+                <td>Warning banner says: <em>"Admin Override Mode: You have access to edit"</em>. Inputs are unlocked for Super Admin.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>3.4</td>
+                <td>Log in as standard judge (e.g. <strong>satya@literacyindia.org</strong>) and click an active assessment. Enter scores.</td>
+                <td>Scores save automatically. Total score updates in real time.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Section 4: Event Leads -->
+    <div class="section-title page-break">4. Event Leads & Results Panel <span class="badge badge-lead">Event Leads</span></div>
+    <table>
+        <thead>
+            <tr>
+                <th class="col-check">Done</th>
+                <th class="col-step">Step</th>
+                <th>Test Instructions</th>
+                <th>Expected Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>4.1</td>
+                <td>Log in as a Coordinator who was mapped as Event Lead. Open <strong>Results & Rankings</strong>.</td>
+                <td>Leaderboard dropdown displays. User has full access to calculate rankings across <strong>All Centres</strong>.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>4.2</td>
+                <td>Trigger the <strong>Disqualify</strong> action for a participant on the leaderboard.</td>
+                <td>Confirmation modal opens. On confirm, participant's qualification status changes to <code>DISQUALIFIED</code> and rank updates.</td>
+            </tr>
+            <tr>
+                <td class="col-check"><div class="checkbox-box"></div></td>
+                <td>4.3</td>
+                <td>Click <strong>Confirm Rankings & Promote Finalists</strong> to advance Stage 1 participants.</td>
+                <td>Qualified finalists are registered to Stage 2. Stage 2 status transitions to <code>SCHEDULED</code>, and its assessments status updates to <code>ACTIVE</code>.</td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>
