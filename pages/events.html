@@ -171,22 +171,23 @@
                                 ? `<button class="btn btn-primary btn-sm" onclick="window.location.href='event-builder.html?event_id=${e.id}'" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>`
                                 : `<button class="btn btn-secondary btn-sm" disabled style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px; opacity: 0.6; cursor: not-allowed;" title="Cannot edit: Final date has passed">Edit</button>`;
 
-                            let statusActionBtn = '';
-                            if (e.status === 'PLANNING') {
-                                statusActionBtn = `<button class="btn btn-success btn-sm" onclick="startEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Start</button>`;
-                            } else if (e.status === 'IN_PROGRESS') {
-                                statusActionBtn = `<button class="btn btn-secondary btn-sm" onclick="completeEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Complete</button>`;
+                            if (e.status === 'ARCHIVED') {
+                                actionsHtml = `
+                                    <td>
+                                        <button class="btn btn-success btn-sm" onclick="unarchiveEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Unarchive</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
+                                    </td>
+                                `;
+                            } else {
+                                actionsHtml = `
+                                    <td>
+                                        ${editBtn}
+                                        <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="manageEventLeads('${e.id}', '${e.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Leads</button>
+                                        <button class="btn btn-danger btn-sm" onclick="archiveEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Archive</button>
+                                    </td>
+                                `;
                             }
-
-                            actionsHtml = `
-                                <td>
-                                    ${statusActionBtn}
-                                    ${editBtn}
-                                    <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
-                                    <button class="btn btn-secondary btn-sm" onclick="manageEventLeads('${e.id}', '${e.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Leads</button>
-                                    <button class="btn btn-danger btn-sm" onclick="archiveEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Archive</button>
-                                </td>
-                            `;
                         }
 
                         tr.innerHTML = `
@@ -339,39 +340,52 @@
             }
         }
 
-        async function startEvent(eventId) {
-            const conf = confirm("Are you sure you want to start this event and mark it as IN_PROGRESS?");
+        async function unarchiveEvent(eventId) {
+            const conf = confirm("Are you sure you want to unarchive this event?");
             if (!conf) return;
 
             try {
+                // Fetch the event's dates to calculate correct status
+                const { data: event, error: fetchErr } = await window.supabaseClient
+                    .from('events')
+                    .select('registration_start, registration_end, start_date, end_date')
+                    .eq('id', eventId)
+                    .single();
+
+                if (fetchErr) throw fetchErr;
+
+                const now = new Date();
+                let restoredStatus = 'PLANNING';
+
+                if (event.registration_start && event.registration_end && event.start_date && event.end_date) {
+                    const regStart = new Date(`${event.registration_start}T05:00:00+05:30`);
+                    const regEnd = new Date(`${event.registration_end}T23:59:00+05:30`);
+                    const start = new Date(`${event.start_date}T05:00:00+05:30`);
+                    const end = new Date(`${event.end_date}T23:59:00+05:30`);
+
+                    if (now < regStart) {
+                        restoredStatus = 'PLANNING';
+                    } else if (now >= regStart && now <= regEnd) {
+                        restoredStatus = 'REGISTRATION';
+                    } else if (now > regEnd && now < start) {
+                        restoredStatus = 'PRACTICE';
+                    } else if (now >= start && now <= end) {
+                        restoredStatus = 'ASSESSMENT';
+                    } else if (now > end) {
+                        restoredStatus = 'COMPLETED';
+                    }
+                }
+
                 const { error } = await window.supabaseClient
                     .from('events')
-                    .update({ status: 'IN_PROGRESS' })
+                    .update({ status: restoredStatus })
                     .eq('id', eventId);
 
                 if (error) throw error;
                 await loadEventsRegistry();
             } catch (err) {
-                console.error("Start event failed:", err);
-                alert("Failed to start event: " + err.message);
-            }
-        }
-
-        async function completeEvent(eventId) {
-            const conf = confirm("Are you sure you want to complete this event?");
-            if (!conf) return;
-
-            try {
-                const { error } = await window.supabaseClient
-                    .from('events')
-                    .update({ status: 'COMPLETED' })
-                    .eq('id', eventId);
-
-                if (error) throw error;
-                await loadEventsRegistry();
-            } catch (err) {
-                console.error("Complete event failed:", err);
-                alert("Failed to complete event: " + err.message);
+                console.error("Unarchive failed:", err);
+                alert("Failed to unarchive: " + err.message);
             }
         }
 

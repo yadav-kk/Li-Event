@@ -159,7 +159,7 @@
 
                 if (isOutsideDateWindow) {
                     // Check if current user is a system Administrator (Super Admin or Prog Admin)
-                    const isAdmin = window.Auth.hasRole(['super_admin', 'prog_admin']);
+                    const isAdmin = window.Auth.hasRole('super_admin');
 
                     if (isAdmin) {
                         // Display admin override warning banner

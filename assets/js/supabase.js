@@ -25,8 +25,8 @@ async function syncEventStatuses() {
     try {
         const { data: events, error } = await window.supabaseClient
             .from('events')
-            .select('id, start_date, end_date, status')
-            .in('status', ['PLANNING', 'IN_PROGRESS']);
+            .select('id, start_date, end_date, registration_start, registration_end, status')
+            .in('status', ['PLANNING', 'REGISTRATION', 'PRACTICE', 'ASSESSMENT']);
 
         if (error) throw error;
         if (!events || events.length === 0) return;
@@ -35,29 +35,34 @@ async function syncEventStatuses() {
         const updates = [];
 
         for (const e of events) {
-            if (!e.start_date || !e.end_date) continue;
+            if (!e.registration_start || !e.registration_end || !e.start_date || !e.end_date) continue;
             
+            const regStart = new Date(`${e.registration_start}T05:00:00+05:30`);
+            const regEnd = new Date(`${e.registration_end}T23:59:00+05:30`);
             const start = new Date(`${e.start_date}T05:00:00+05:30`);
             const end = new Date(`${e.end_date}T23:59:00+05:30`);
 
-            if (now >= start && now <= end) {
-                if (e.status === 'PLANNING') {
-                    updates.push(
-                        window.supabaseClient
-                            .from('events')
-                            .update({ status: 'IN_PROGRESS' })
-                            .eq('id', e.id)
-                    );
-                }
+            let targetStatus = e.status;
+
+            if (now < regStart) {
+                targetStatus = 'PLANNING';
+            } else if (now >= regStart && now <= regEnd) {
+                targetStatus = 'REGISTRATION';
+            } else if (now > regEnd && now < start) {
+                targetStatus = 'PRACTICE';
+            } else if (now >= start && now <= end) {
+                targetStatus = 'ASSESSMENT';
             } else if (now > end) {
-                if (e.status === 'PLANNING' || e.status === 'IN_PROGRESS') {
-                    updates.push(
-                        window.supabaseClient
-                            .from('events')
-                            .update({ status: 'COMPLETED' })
-                            .eq('id', e.id)
-                    );
-                }
+                targetStatus = 'COMPLETED';
+            }
+
+            if (targetStatus !== e.status) {
+                updates.push(
+                    window.supabaseClient
+                        .from('events')
+                        .update({ status: targetStatus })
+                        .eq('id', e.id)
+                );
             }
         }
 
