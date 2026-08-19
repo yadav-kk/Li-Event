@@ -1051,8 +1051,8 @@
                             name: st.name,
                             sequence: st.sequence,
                             venue: st.venue,
-                            start_datetime: st.startDate ? `${st.startDate}T00:00:00+05:30` : null,
-                            end_datetime: st.endDate ? `${st.endDate}T23:59:59+05:30` : null,
+                            start_datetime: st.startDate ? `${st.startDate}T05:00:00+05:30` : null,
+                            end_datetime: st.endDate ? `${st.endDate}T23:59:00+05:30` : null,
                             status: st.sequence === 1 ? 'SCHEDULED' : 'DRAFT',
                             advancement_rule_id: advRule.rule,
                             advancement_rule_value: advRule.value
@@ -1072,7 +1072,9 @@
                                 name: ass.name,
                                 sequence: ass.sequence,
                                 max_marks: ass.max_marks,
-                                status: 'DRAFT'
+                                status: 'DRAFT',
+                                start_datetime: stage.start_datetime,
+                                end_datetime: stage.end_datetime
                             })
                             .select()
                             .single();

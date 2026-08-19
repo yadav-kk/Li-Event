@@ -256,7 +256,9 @@
                             venue: st.venue,
                             status: 'DRAFT',
                             advancement_rule_id: st.advancement_rule_id,
-                            advancement_rule_value: st.advancement_rule_value
+                            advancement_rule_value: st.advancement_rule_value,
+                            start_datetime: st.start_datetime,
+                            end_datetime: st.end_datetime
                         })
                         .select()
                         .single();
@@ -284,7 +286,9 @@
                                 max_marks: ass.max_marks,
                                 status: 'DRAFT',
                                 required: ass.required,
-                                judge_assignment_mode: ass.judge_assignment_mode
+                                judge_assignment_mode: ass.judge_assignment_mode,
+                                start_datetime: ass.start_datetime,
+                                end_datetime: ass.end_datetime
                             })
                             .select()
                             .single();
