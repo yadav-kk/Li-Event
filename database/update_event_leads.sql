@@ -9,21 +9,5 @@ CREATE TABLE IF NOT EXISTS public.event_leads (
     UNIQUE (event_id, user_id)
 );
 
--- Enable Row Level Security (RLS)
-ALTER TABLE public.event_leads ENABLE ROW LEVEL SECURITY;
-
--- 1. Policy: Authenticated users can read event leads
-DROP POLICY IF EXISTS "Enable select for all authenticated users" ON public.event_leads;
-CREATE POLICY "Enable select for all authenticated users" 
-    ON public.event_leads FOR SELECT 
-    TO authenticated 
-    USING (true);
-
--- 2. Policy: Super admins and Program admins can perform all write operations
-DROP POLICY IF EXISTS "Enable all actions for administrators" ON public.event_leads;
-CREATE POLICY "Enable all actions for administrators" 
-    ON public.event_leads FOR ALL 
-    TO authenticated 
-    USING (
-        true -- Simplified bypass for front-end control, or check user role in query
-    );
+-- Disable Row Level Security (RLS) to match the project's architecture
+ALTER TABLE public.event_leads DISABLE ROW LEVEL SECURITY;
