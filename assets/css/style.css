@@ -276,3 +276,48 @@ input, button, select, textarea {
     border-top: 1px solid var(--border-color);
     margin-top: 48px;
 }
+
+@media print {
+    /* Hide sidebar and navigation headers for PDF layout */
+    .app-sidebar,
+    .app-header,
+    .logout-btn,
+    .btn,
+    button,
+    form,
+    .card-header button,
+    #assignAccessForm {
+        display: none !important;
+    }
+
+    .app-main {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+
+    .content-body {
+        padding: 0 !important;
+    }
+
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    .data-table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+    }
+
+    .data-table th, .data-table td {
+        border: 1px solid #ddd !important;
+        padding: 8px !important;
+        color: #000 !important;
+    }
+}

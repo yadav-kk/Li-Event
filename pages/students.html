@@ -14,6 +14,7 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+    <script src="../assets/js/export-helper.js"></script>
 </head>
 <body>
 
@@ -179,10 +180,12 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 8px;">
                         <h3 class="card-title">Active Participant Roster</h3>
                         
-                        <div style="display: flex; gap: 12px;">
+                        <div style="display: flex; gap: 12px; align-items: center;">
                             <select class="form-control" id="filterCentre" style="width: 180px;">
                                 <option value="">All Centres</option>
                             </select>
+                            <button class="btn btn-secondary btn-sm" onclick="exportParticipantsToCSV()" style="padding: 6px 12px; font-size: 0.8rem;">Export CSV</button>
+                            <button class="btn btn-secondary btn-sm" onclick="window.print()" style="padding: 6px 12px; font-size: 0.8rem;">Print PDF</button>
                         </div>
                     </div>
                     
@@ -835,6 +838,10 @@
             document.body.appendChild(link); // Required for Firefox
             link.click();
             document.body.removeChild(link);
+        }
+
+        function exportParticipantsToCSV() {
+            window.ExportHelper.exportTableToCSV('studentsTable', 'participants_registry.csv');
         }
     </script>
 </body>

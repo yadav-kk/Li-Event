@@ -14,6 +14,7 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+    <script src="../assets/js/export-helper.js"></script>
 </head>
 <body>
 
@@ -76,7 +77,13 @@
 
                 <!-- Leaderboard Grid -->
                 <div class="card">
-                    <h3 class="card-title">Scoreboard & Status</h3>
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="card-title" style="margin: 0;">Scoreboard & Status</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="exportScoreboardToCSV()" style="padding: 6px 12px; font-size: 0.8rem;">Export CSV</button>
+                            <button class="btn btn-secondary btn-sm" onclick="window.print()" style="padding: 6px 12px; font-size: 0.8rem;">Print PDF</button>
+                        </div>
+                    </div>
                     <div class="table-container" style="border: none; margin-bottom: 0;">
                         <table class="data-table" id="resultsTable">
                             <thead>
@@ -427,6 +434,13 @@
                 console.error("Promotion failed:", err);
                 alert("Promotion failed: " + err.message);
             }
+        }
+
+        function exportScoreboardToCSV() {
+            const selectEl = document.getElementById('stageSelect');
+            const stageName = selectEl.options[selectEl.selectedIndex]?.text || 'stage';
+            const cleanStageName = stageName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            window.ExportHelper.exportTableToCSV('resultsTable', `scoreboard_${cleanStageName}.csv`);
         }
     </script>
 </body>
