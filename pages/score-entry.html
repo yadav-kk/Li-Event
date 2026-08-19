@@ -158,19 +158,10 @@
                 }
 
                 if (isOutsideDateWindow) {
-                    // Check if current user is an Admin, CEO, or Event Lead
-                    const userProfile = window.Auth.getUserProfile();
-                    const isAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
-                    
-                    let isLead = false;
-                    const { count: leadCount } = await window.supabaseClient
-                        .from('event_leads')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('user_id', userProfile.id)
-                        .eq('event_id', assess.stage_id.event_id.id);
-                    isLead = leadCount > 0;
+                    // Check if current user is a system Administrator (Super Admin or Prog Admin)
+                    const isAdmin = window.Auth.hasRole(['super_admin', 'prog_admin']);
 
-                    if (isAdmin || isLead) {
+                    if (isAdmin) {
                         // Display admin override warning banner
                         const alertDiv = document.createElement('div');
                         alertDiv.className = 'alert alert-warning';

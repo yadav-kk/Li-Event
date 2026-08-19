@@ -104,18 +104,7 @@
 
                 if (asErr) throw asErr;
 
-                const profile = window.Auth.getUserProfile();
-                const isAdminOrPD = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo', 'project_director']) || (profile && profile.email === 'judge@test.com');
-                
-                // Fetch event leads for this user
-                let leadEventIds = [];
-                if (profile) {
-                    const { data: leadData } = await window.supabaseClient
-                        .from('event_leads')
-                        .select('event_id')
-                        .eq('user_id', profile.id);
-                    leadEventIds = leadData ? leadData.map(l => l.event_id) : [];
-                }
+                const hasAdminOverride = window.Auth.hasRole(['super_admin', 'prog_admin']);
 
                 const tbody = document.querySelector('#judgeAssessTable tbody');
                 tbody.innerHTML = '';
@@ -125,9 +114,6 @@
                     assessments.forEach(a => {
                         const start = a.start_datetime ? new Date(a.start_datetime) : null;
                         const end = a.end_datetime ? new Date(a.end_datetime) : null;
-                        
-                        const isLead = leadEventIds.includes(a.stage_id.event_id.id);
-                        const hasAdminOverride = isAdminOrPD || isLead;
 
                         let badgeColor = 'completed'; // green
                         let statusText = 'Open';
