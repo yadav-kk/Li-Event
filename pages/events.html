@@ -168,8 +168,16 @@
                                 ? `<button class="btn btn-primary btn-sm" onclick="window.location.href='event-builder.html?event_id=${e.id}'" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>`
                                 : `<button class="btn btn-secondary btn-sm" disabled style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px; opacity: 0.6; cursor: not-allowed;" title="Cannot edit: Final date has passed">Edit</button>`;
 
+                            let statusActionBtn = '';
+                            if (e.status === 'PLANNING') {
+                                statusActionBtn = `<button class="btn btn-success btn-sm" onclick="startEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Start</button>`;
+                            } else if (e.status === 'IN_PROGRESS') {
+                                statusActionBtn = `<button class="btn btn-secondary btn-sm" onclick="completeEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Complete</button>`;
+                            }
+
                             actionsHtml = `
                                 <td>
+                                    ${statusActionBtn}
                                     ${editBtn}
                                     <button class="btn btn-secondary btn-sm" onclick="cloneEvent('${e.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Clone</button>
                                     <button class="btn btn-secondary btn-sm" onclick="manageEventLeads('${e.id}', '${e.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-left: 4px;">Leads</button>
@@ -252,7 +260,7 @@
                             description: st.description,
                             sequence: st.sequence,
                             venue: st.venue,
-                            status: 'DRAFT',
+                            status: st.sequence === 1 ? 'SCHEDULED' : 'DRAFT',
                             advancement_rule_id: st.advancement_rule_id,
                             advancement_rule_value: st.advancement_rule_value,
                             start_datetime: st.start_datetime,
@@ -282,7 +290,7 @@
                                 assessment_type: ass.assessment_type,
                                 sequence: ass.sequence,
                                 max_marks: ass.max_marks,
-                                status: 'DRAFT',
+                                status: newStage.status === 'SCHEDULED' ? 'ACTIVE' : 'DRAFT',
                                 required: ass.required,
                                 judge_assignment_mode: ass.judge_assignment_mode,
                                 start_datetime: ass.start_datetime,
@@ -325,6 +333,42 @@
             } catch (err) {
                 console.error("Clone failed:", err);
                 alert("Cloning transaction failed: " + err.message);
+            }
+        }
+
+        async function startEvent(eventId) {
+            const conf = confirm("Are you sure you want to start this event and mark it as IN_PROGRESS?");
+            if (!conf) return;
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('events')
+                    .update({ status: 'IN_PROGRESS' })
+                    .eq('id', eventId);
+
+                if (error) throw error;
+                await loadEventsRegistry();
+            } catch (err) {
+                console.error("Start event failed:", err);
+                alert("Failed to start event: " + err.message);
+            }
+        }
+
+        async function completeEvent(eventId) {
+            const conf = confirm("Are you sure you want to complete this event?");
+            if (!conf) return;
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('events')
+                    .update({ status: 'COMPLETED' })
+                    .eq('id', eventId);
+
+                if (error) throw error;
+                await loadEventsRegistry();
+            } catch (err) {
+                console.error("Complete event failed:", err);
+                alert("Failed to complete event: " + err.message);
             }
         }
 
