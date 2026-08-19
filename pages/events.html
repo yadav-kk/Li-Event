@@ -103,7 +103,6 @@
                                     <th>Event Code</th>
                                     <th>Name</th>
                                     <th>Year</th>
-                                    <th>Class</th>
                                     <th>Timeline</th>
                                     <th>Status</th>
                                     <th data-allowed-roles="super_admin, prog_admin">Actions</th>
@@ -183,7 +182,6 @@
                             <td><strong>${e.event_code}</strong></td>
                             <td>${e.name}</td>
                             <td>${e.academic_year}</td>
-                            <td>Class ${e.class}</td>
                             <td><small>${start} to ${end}</small></td>
                             <td><span class="badge badge-${e.status.toLowerCase()}">${e.status}</span></td>
                             ${actionsHtml}
@@ -191,7 +189,7 @@
                         tbody.appendChild(tr);
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No events found in register.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No events found in register.</td></tr>`;
                 }
 
             } catch (err) {
@@ -217,7 +215,7 @@
                 // Create cloned name & code
                 const nextYear = parseInt(srcEvent.academic_year) + 1 || 2027;
                 const newCode = `${srcEvent.event_code.split('-')[0]}-${srcEvent.event_code.split('-')[1] || 'LIT'}-${nextYear}`;
-                const newName = `${srcEvent.name.split('–')[0]} – Class V Literacy Challenge ${nextYear}`;
+                const newName = `${srcEvent.name.split('–')[0]} – Literacy Challenge ${nextYear}`;
 
                 // 2. Insert new event
                 const { data: newEvent, error: insErr } = await window.supabaseClient
@@ -226,7 +224,7 @@
                         name: newName,
                         event_code: newCode,
                         academic_year: nextYear.toString(),
-                        class: srcEvent.class,
+                        class: srcEvent.class || 'N/A',
                         description: srcEvent.description,
                         objective: srcEvent.objective,
                         status: 'DRAFT'

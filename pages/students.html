@@ -62,7 +62,7 @@
                 <div class="card" id="importPane" style="display: none; margin-bottom: 24px; border-color: var(--primary);">
                     <h3 class="card-title">Bulk Import Participants from CSV</h3>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
-                        <span>CSV columns: <code>Participant Name</code>, <code>Gender</code>, <code>Class</code>, <code>Centre Code</code>, <code>Program Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.</span>
+                        <span>CSV columns: <code>Participant Name</code>, <code>Gender</code>, <code>Centre Code</code>, <code>Program Code</code>, <code>Guardian Name</code>, <code>Guardian Mobile</code>, <code>Language</code>.</span>
                         <button class="btn btn-secondary btn-sm" onclick="downloadSampleCSV()" style="padding: 6px 12px; font-size: 0.75rem;">Download Sample CSV</button>
                     </p>
                     
@@ -687,12 +687,12 @@
 
                 const name = cols[0];
                 const gender = cols[1];
-                const targetClass = cols[2] || '1';
-                const centreCode = cols[3];
-                const programCode = cols[4];
-                const guardName = cols[5];
-                const guardMobile = cols[6];
-                const lang = cols[7] || 'Hindi';
+                const centreCode = cols[2];
+                const programCode = cols[3];
+                const guardName = cols[4];
+                const guardMobile = cols[5];
+                const lang = cols[6] || 'Hindi';
+                const targetClass = 'N/A';
 
                 // Simple validation check
                 const isValid = name && gender && centreCode && programCode;
@@ -827,9 +827,9 @@
         function downloadSampleCSV() {
             // Build conforming CSV content template
             const csvContent = "data:text/csv;charset=utf-8," 
-                + "Participant Name,Gender,Class,Centre Code,Program Code,Guardian Name,Guardian Mobile,Language\n"
-                + "Amit Kumar,M,V,DL-02,SCH-01,Rajesh Kumar,9876543210,Hindi\n"
-                + "Sunita Devi,F,V,HR-02,SCH-02,Sanjay Singh,9876543211,English\n";
+                + "Participant Name,Gender,Centre Code,Program Code,Guardian Name,Guardian Mobile,Language\n"
+                + "Amit Kumar,M,DL-02,SCH-01,Rajesh Kumar,9876543210,Hindi\n"
+                + "Sunita Devi,F,HR-02,SCH-02,Sanjay Singh,9876543211,English\n";
                 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
