@@ -470,12 +470,6 @@
             e.preventDefault();
             if (!window.supabaseClient) return;
 
-            // Generate structured GT-LIT student code: GT-LIT-2026-XXXXXX
-            // For simple implementation, we generate a random 6-digit number to guarantee uniqueness
-            const suffix = Math.floor(100000 + Math.random() * 900000);
-            const academicYear = "2026";
-            const studentIdCode = `GT-LIT-${academicYear}-${suffix}`;
-
             const name = document.getElementById('studName').value.trim();
             const gender = document.getElementById('studGender').value;
             const dob = document.getElementById('studDOB').value || null;
@@ -486,6 +480,9 @@
             const guardianMobile = document.getElementById('studMobile').value.trim();
             const language = document.getElementById('studLanguage').value.trim();
             const eventId = document.getElementById('studEvent').value;
+
+            const selectedEvent = loadedEvents.find(ev => ev.id === eventId);
+            const eventCode = selectedEvent ? selectedEvent.event_code : 'REG';
 
             try {
                 // Fetch the first phase (sequence = 1) of the selected event
@@ -524,7 +521,6 @@
                         .select('id, event_id')
                         .eq('student_id', editStudentId)
                         .maybeSingle();
-
                     if (currentEp) {
                         if (currentEp.event_id !== eventId) {
                             // Event changed! Clean up previous stage registration and write new ones
@@ -534,13 +530,29 @@
                                 .eq('id', currentEp.id);
                             if (delEp) throw delEp;
 
+                            // Calculate next serial number for new event
+                            const { count, error: countErr } = await window.supabaseClient
+                                .from('event_participants')
+                                .select('id', { count: 'exact', head: true })
+                                .eq('event_id', eventId);
+                            if (countErr) throw countErr;
+
+                            const nextSerial = (count + 1).toString().padStart(4, '0');
+                            const studentIdCode = `${eventCode}-${nextSerial}`;
+
+                            // Update student ID on student record
+                            await window.supabaseClient
+                                .from('students')
+                                .update({ student_id: studentIdCode })
+                                .eq('id', editStudentId);
+
                             // Create new event participant entry
                             const { data: newEp, error: insEp } = await window.supabaseClient
                                 .from('event_participants')
                                 .insert({
                                     event_id: eventId,
                                     student_id: editStudentId,
-                                    registration_number: `REG-2026-${suffix}`,
+                                    registration_number: studentIdCode,
                                     registration_status: 'APPROVED',
                                     eligibility_status: 'ELIGIBLE',
                                     current_stage_id: stageId
@@ -562,12 +574,27 @@
                         }
                     } else {
                         // Create registration if missing
+                        const { count, error: countErr } = await window.supabaseClient
+                            .from('event_participants')
+                            .select('id', { count: 'exact', head: true })
+                            .eq('event_id', eventId);
+                        if (countErr) throw countErr;
+
+                        const nextSerial = (count + 1).toString().padStart(4, '0');
+                        const studentIdCode = `${eventCode}-${nextSerial}`;
+
+                        // Update student ID on student record
+                        await window.supabaseClient
+                            .from('students')
+                            .update({ student_id: studentIdCode })
+                            .eq('id', editStudentId);
+
                         const { data: newEp, error: insEp } = await window.supabaseClient
                             .from('event_participants')
                             .insert({
                                 event_id: eventId,
                                 student_id: editStudentId,
-                                registration_number: `REG-2026-${suffix}`,
+                                registration_number: studentIdCode,
                                 registration_status: 'APPROVED',
                                 eligibility_status: 'ELIGIBLE',
                                 current_stage_id: stageId
@@ -586,10 +613,20 @@
                                 attendance: 'PRESENT'
                             });
                         if (insSp) throw insSp;
-                    }
+                    } }
 
                     alert("Participant details updated successfully!");
                 } else {
+                    // Calculate next serial number for new student
+                    const { count, error: countErr } = await window.supabaseClient
+                        .from('event_participants')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('event_id', eventId);
+                    if (countErr) throw countErr;
+
+                    const nextSerial = (count + 1).toString().padStart(4, '0');
+                    const studentIdCode = `${eventCode}-${nextSerial}`;
+
                     // Insert Student
                     const { data: student, error: insErr } = await window.supabaseClient
                         .from('students')
@@ -617,7 +654,7 @@
                         .insert({
                             event_id: eventId,
                             student_id: student.id,
-                            registration_number: `REG-2026-${suffix}`,
+                            registration_number: studentIdCode,
                             registration_status: 'APPROVED',
                             eligibility_status: 'ELIGIBLE',
                             current_stage_id: stageId
@@ -747,7 +784,18 @@
                     .single();
 
                 if (stageErr) throw stageErr;
-                const stageId = firstStage.id;
+                const stageId = firstStage.id;                // Fetch the event code of the selected event
+                const selectedEvent = loadedEvents.find(ev => ev.id === eventId);
+                const eventCode = selectedEvent ? selectedEvent.event_code : 'REG';
+
+                // Fetch initial count of event participants
+                const { count: initialCount, error: countErr } = await window.supabaseClient
+                    .from('event_participants')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('event_id', eventId);
+                if (countErr) throw countErr;
+
+                let currentCount = initialCount;
 
                 for (const row of importedParsedRows) {
                     // 1. Resolve Centre ID from Code
@@ -758,8 +806,9 @@
                     const matchingProgram = programs.find(s => s.program_code === row.programCode);
                     const programIdVal = matchingProgram ? matchingProgram.id : null;
 
-                    const suffix = Math.floor(100000 + Math.random() * 900000);
-                    const studentIdCode = `GT-LIT-2026-${suffix}`;
+                    currentCount++;
+                    const nextSerial = currentCount.toString().padStart(4, '0');
+                    const studentIdCode = `${eventCode}-${nextSerial}`;
 
                     // Insert student
                     const { data: student, error: insErr } = await window.supabaseClient
@@ -787,7 +836,7 @@
                         .insert({
                             event_id: eventId,
                             student_id: student.id,
-                            registration_number: `REG-2026-${suffix}`,
+                            registration_number: studentIdCode,
                             registration_status: 'APPROVED',
                             eligibility_status: 'ELIGIBLE',
                             current_stage_id: stageId
