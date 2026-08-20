@@ -184,6 +184,9 @@
                             <select class="form-control" id="filterCentre" style="width: 180px;">
                                 <option value="">All Centres</option>
                             </select>
+                            <select class="form-control" id="filterEvent" style="width: 180px;">
+                                <option value="">All Events</option>
+                            </select>
                             <button class="btn btn-secondary btn-sm" onclick="exportParticipantsToCSV()" style="padding: 6px 12px; font-size: 0.8rem;">Export CSV</button>
                             <button class="btn btn-secondary btn-sm" onclick="window.print()" style="padding: 6px 12px; font-size: 0.8rem;">Print PDF</button>
                         </div>
@@ -234,6 +237,7 @@
             // Bind listeners
             document.getElementById('enrollStudentForm').addEventListener('submit', handleSingleRegistration);
             document.getElementById('filterCentre').addEventListener('change', loadStudentsList);
+            document.getElementById('filterEvent').addEventListener('change', loadStudentsList);
             document.getElementById('csvFileInput').addEventListener('change', handleCSVFileSelect);
 
 
@@ -293,8 +297,10 @@
                 }
                 const studEvent = document.getElementById('studEvent');
                 const csvEvent = document.getElementById('csvEvent');
+                const filterEvent = document.getElementById('filterEvent');
                 studEvent.innerHTML = '<option value="">-- Select Event --</option>';
                 csvEvent.innerHTML = '<option value="">-- Select Event --</option>';
+                filterEvent.innerHTML = '<option value="">All Events</option>';
                 if (loadedEvents && loadedEvents.length > 0) {
                     loadedEvents.forEach(e => {
                         const opt = document.createElement('option');
@@ -304,6 +310,11 @@
 
                         const optCsv = opt.cloneNode(true);
                         csvEvent.appendChild(optCsv);
+
+                        const optFilter = document.createElement('option');
+                        optFilter.value = e.id;
+                        optFilter.textContent = e.name;
+                        filterEvent.appendChild(optFilter);
                     });
                 }
 
@@ -334,17 +345,26 @@
             if (!window.supabaseClient) return;
 
             const selectedCentre = document.getElementById('filterCentre').value;
+            const selectedEvent = document.getElementById('filterEvent').value;
             const tbody = document.querySelector('#studentsTable tbody');
             tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Refreshing list...</td></tr>`;
 
             try {
+                let selectStr = '*, centres(centre_name), programs:program_id(program_name), event_participants(event_id, events(name))';
+                if (selectedEvent) {
+                    selectStr = '*, centres(centre_name), programs:program_id(program_name), event_participants!inner(event_id, events(name))';
+                }
+
                 let query = window.supabaseClient
                     .from('students')
-                    .select('*, centres(centre_name), programs:program_id(program_name), event_participants(events(name))')
+                    .select(selectStr)
                     .order('created_at', { ascending: false });
 
                 if (selectedCentre) {
                     query = query.eq('centre_id', selectedCentre);
+                }
+                if (selectedEvent) {
+                    query = query.eq('event_participants.event_id', selectedEvent);
                 }
 
                 const { data: students, error } = await query;
