@@ -181,6 +181,7 @@
                         <h3 class="card-title">Active Participant Roster</h3>
                         
                         <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="text" class="form-control" id="searchRoster" placeholder="Search ID or Name..." style="width: 200px; padding: 6px 12px;">
                             <select class="form-control" id="filterCentre" style="width: 180px;">
                                 <option value="">All Centres</option>
                             </select>
@@ -238,6 +239,7 @@
             document.getElementById('enrollStudentForm').addEventListener('submit', handleSingleRegistration);
             document.getElementById('filterCentre').addEventListener('change', loadStudentsList);
             document.getElementById('filterEvent').addEventListener('change', loadStudentsList);
+            document.getElementById('searchRoster').addEventListener('input', handleSearchAndFilter);
             document.getElementById('csvFileInput').addEventListener('change', handleCSVFileSelect);
 
 
@@ -370,47 +372,67 @@
                 const { data: students, error } = await query;
                 if (error) throw error;
 
-                tbody.innerHTML = '';
                 loadedStudents = students || [];
-
-                const canEdit = window.Auth.hasRole(['centre_incharge', 'super_admin', 'prog_admin']);
-                const canDelete = window.Auth.hasRole(['coordinator', 'super_admin', 'prog_admin']);
-
-                if (students && students.length > 0) {
-                    students.forEach(s => {
-                        const eventName = s.event_participants && s.event_participants[0] && s.event_participants[0].events ? s.event_participants[0].events.name : 'N/A';
-                        
-                        let actionsHtml = '';
-                        if (canEdit) {
-                            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="editStudent('${s.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>`;
-                        }
-                        if (canDelete) {
-                            actionsHtml += `<button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>`;
-                        }
-                        if (!actionsHtml) {
-                            actionsHtml = '<span style="color: var(--text-muted);">—</span>';
-                        }
-
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td><strong>${s.student_id}</strong></td>
-                            <td>${s.name}</td>
-                            <td>${s.gender}</td>
-                            <td>${eventName}</td>
-                            <td>${s.centres ? s.centres.centre_name : 'N/A'}</td>
-                            <td>${s.programs ? s.programs.program_name : 'N/A'}</td>
-                            <td>${s.guardian_mobile || 'N/A'}</td>
-                            <td><span class="badge badge-completed">${s.status}</span></td>
-                            <td>${actionsHtml}</td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                } else {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No participant records found.</td></tr>`;
-                }
+                handleSearchAndFilter();
 
             } catch (err) {
                 console.error("Error fetching students roster:", err);
+            }
+        }
+
+        function handleSearchAndFilter() {
+            const query = document.getElementById('searchRoster').value.toLowerCase().trim();
+            if (!query) {
+                renderStudentsTable(loadedStudents);
+                return;
+            }
+
+            const filtered = loadedStudents.filter(s => {
+                const idMatch = s.student_id && s.student_id.toLowerCase().includes(query);
+                const nameMatch = s.name && s.name.toLowerCase().includes(query);
+                return idMatch || nameMatch;
+            });
+            renderStudentsTable(filtered);
+        }
+
+        function renderStudentsTable(studentsList) {
+            const tbody = document.querySelector('#studentsTable tbody');
+            tbody.innerHTML = '';
+
+            const canEdit = window.Auth.hasRole(['centre_incharge', 'super_admin', 'prog_admin']);
+            const canDelete = window.Auth.hasRole(['coordinator', 'super_admin', 'prog_admin']);
+
+            if (studentsList && studentsList.length > 0) {
+                studentsList.forEach(s => {
+                    const eventName = s.event_participants && s.event_participants[0] && s.event_participants[0].events ? s.event_participants[0].events.name : 'N/A';
+                    
+                    let actionsHtml = '';
+                    if (canEdit) {
+                        actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="editStudent('${s.id}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Edit</button>`;
+                    }
+                    if (canDelete) {
+                        actionsHtml += `<button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>`;
+                    }
+                    if (!actionsHtml) {
+                        actionsHtml = '<span style="color: var(--text-muted);">—</span>';
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${s.student_id}</strong></td>
+                        <td>${s.name}</td>
+                        <td>${s.gender}</td>
+                        <td>${eventName}</td>
+                        <td>${s.centres ? s.centres.centre_name : 'N/A'}</td>
+                        <td>${s.programs ? s.programs.program_name : 'N/A'}</td>
+                        <td>${s.guardian_mobile || 'N/A'}</td>
+                        <td><span class="badge badge-completed">${s.status}</span></td>
+                        <td>${actionsHtml}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No participant records found.</td></tr>`;
             }
         }
 
