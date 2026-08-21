@@ -436,6 +436,28 @@
             }
         }
 
+        async function getNextSerial(eventCode) {
+            const { data, error } = await window.supabaseClient
+                .from('students')
+                .select('student_id')
+                .like('student_id', `${eventCode}-%`);
+            
+            if (error) throw error;
+            
+            let maxSerial = 0;
+            if (data && data.length > 0) {
+                data.forEach(s => {
+                    const parts = s.student_id.split('-');
+                    const lastPart = parts[parts.length - 1];
+                    const num = parseInt(lastPart, 10);
+                    if (!isNaN(num) && num > maxSerial) {
+                        maxSerial = num;
+                    }
+                });
+            }
+            return (maxSerial + 1).toString().padStart(4, '0');
+        }
+
         function toggleImportCard() {
             const pane = document.getElementById('importPane');
             pane.style.display = pane.style.display === 'none' ? 'block' : 'none';
@@ -573,13 +595,7 @@
                             if (delEp) throw delEp;
 
                             // Calculate next serial number for new event
-                            const { count, error: countErr } = await window.supabaseClient
-                                .from('event_participants')
-                                .select('id', { count: 'exact', head: true })
-                                .eq('event_id', eventId);
-                            if (countErr) throw countErr;
-
-                            const nextSerial = (count + 1).toString().padStart(4, '0');
+                            const nextSerial = await getNextSerial(eventCode);
                             const studentIdCode = `${eventCode}-${nextSerial}`;
 
                             // Update student ID on student record
@@ -616,13 +632,7 @@
                         }
                     } else {
                         // Create registration if missing
-                        const { count, error: countErr } = await window.supabaseClient
-                            .from('event_participants')
-                            .select('id', { count: 'exact', head: true })
-                            .eq('event_id', eventId);
-                        if (countErr) throw countErr;
-
-                        const nextSerial = (count + 1).toString().padStart(4, '0');
+                        const nextSerial = await getNextSerial(eventCode);
                         const studentIdCode = `${eventCode}-${nextSerial}`;
 
                         // Update student ID on student record
@@ -660,13 +670,7 @@
                     alert("Participant details updated successfully!");
                 } else {
                     // Calculate next serial number for new student
-                    const { count, error: countErr } = await window.supabaseClient
-                        .from('event_participants')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('event_id', eventId);
-                    if (countErr) throw countErr;
-
-                    const nextSerial = (count + 1).toString().padStart(4, '0');
+                    const nextSerial = await getNextSerial(eventCode);
                     const studentIdCode = `${eventCode}-${nextSerial}`;
 
                     // Insert Student
@@ -830,14 +834,26 @@
                 const selectedEvent = loadedEvents.find(ev => ev.id === eventId);
                 const eventCode = selectedEvent ? selectedEvent.event_code : 'REG';
 
-                // Fetch initial count of event participants
-                const { count: initialCount, error: countErr } = await window.supabaseClient
-                    .from('event_participants')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('event_id', eventId);
-                if (countErr) throw countErr;
+                // Fetch existing IDs for this event prefix to get the maximum serial
+                const { data: existing, error: findErr } = await window.supabaseClient
+                    .from('students')
+                    .select('student_id')
+                    .like('student_id', `${eventCode}-%`);
+                if (findErr) throw findErr;
 
-                let currentCount = initialCount;
+                let maxSerial = 0;
+                if (existing && existing.length > 0) {
+                    existing.forEach(s => {
+                        const parts = s.student_id.split('-');
+                        const lastPart = parts[parts.length - 1];
+                        const num = parseInt(lastPart, 10);
+                        if (!isNaN(num) && num > maxSerial) {
+                            maxSerial = num;
+                        }
+                    });
+                }
+
+                let currentCount = maxSerial;
 
                 for (const row of importedParsedRows) {
                     // 1. Resolve Centre ID from Code
