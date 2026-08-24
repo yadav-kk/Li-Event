@@ -346,18 +346,27 @@
                 const type = document.getElementById('evidenceType').value;
                 const name = document.getElementById('fileName').value.trim();
 
-                // Get clean Event Name from selector
+                // Get clean Event Name and Code from selector
                 const eventSelect = document.getElementById('evidenceEvent');
-                const eventName = eventSelect.options[eventSelect.selectedIndex].text.split(' (')[0].trim();
+                const selectedOptionText = eventSelect.options[eventSelect.selectedIndex].text;
+                const eventName = selectedOptionText.split(' (')[0].trim();
+                const eventCodeMatch = selectedOptionText.match(/\(([^)]+)\)/);
+                const eventCode = eventCodeMatch ? eventCodeMatch[1] : 'EVENT';
 
-                // Fetch Centre Name based on user's profile
-                let centreName = 'Admin Uploads';
-                if (profile.centre_id) {
-                    const { data: centreData } = await window.supabaseClient
-                        .from('centres')
-                        .select('centre_name')
+                // Get Participant details if selected
+                const partSelect = document.getElementById('evidenceParticipant');
+                let formattedFileName = `${eventName} - ${eventCode}`;
+
+                if (partSelect.value) {
+                    const selectedPartText = partSelect.options[partSelect.selectedIndex].text;
+                    const partName = selectedPartText.split(' (')[0].trim();
+                    const partCodeMatch = selectedPartText.match(/\(([^)]+)\)/);
+                    const partCode = partCodeMatch ? partCodeMatch[1] : 'PART';
+                    formattedFileName = `${partName} - ${partCode} - ${eventCode}`;
+                }
+
                 // 1. Upload to Google Drive folder and set viewer permissions
-                const shareLink = await uploadToGoogleDrive(pendingUploadFile, name, googleAccessToken);
+                const shareLink = await uploadToGoogleDrive(pendingUploadFile, formattedFileName, googleAccessToken);
 
                 // 2. Insert evidence record with Google Drive share link into Supabase
                 const { error: insErr } = await window.supabaseClient
