@@ -14,6 +14,9 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+
+    <!-- Google Identity Services client library -->
+    <script src="https://accounts.google.com/gsi/client" onload="initGoogleClient()" async defer></script>
 </head>
 <body>
 
@@ -56,13 +59,12 @@
                     <div class="card-header">
                         <span class="card-title">Upload Verification Evidence</span>
                     </div>
-                    <form id="uploadEvidenceForm" onsubmit="uploadEvidenceRecord(event)">
+                    <form id="uploadEvidenceForm" onsubmit="handleEvidenceFormSubmit(event)">
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Event</label>
                                 <select id="evidenceEvent" class="form-control" required>
-                                    <option value="">Select Event...</option>
-                                    <option value="e9000000-0000-0000-0000-000000000001">GyanTantra se Saksharta 2026</option>
+                                    <option value="">Loading Events...</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -78,14 +80,14 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">File Description / Name</label>
-                                <input type="text" id="fileName" class="form-control" placeholder="e.g. Noida Spelling Test Sheets.pdf" required>
+                                <input type="text" id="fileName" class="form-control" placeholder="e.g. Noida Spelling Test Sheets" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Mock Document File Path / URL</label>
-                                <input type="text" id="fileUrl" class="form-control" placeholder="e.g. /evidence/noida_spelling_sheets.pdf" required>
+                                <label class="form-label">Select File to Upload (Google Drive)</label>
+                                <input type="file" id="evidenceFile" class="form-control" required>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary" style="margin-top: 8px;">Submit Evidence Link</button>
+                        <button type="submit" id="uploadBtn" class="btn btn-primary" style="margin-top: 8px;">Upload & Submit Evidence</button>
                     </form>
                 </div>
 
@@ -97,7 +99,7 @@
                                     <th>Event</th>
                                     <th>Type</th>
                                     <th>File Name</th>
-                                    <th>Path</th>
+                                    <th>View Document</th>
                                     <th>Verification Status</th>
                                     <th data-allowed-roles="super_admin, prog_admin">Actions</th>
                                 </tr>
@@ -117,6 +119,31 @@
     </div>
 
     <script>
+        let tokenClient;
+        let googleAccessToken = null;
+        let pendingUploadFile = null;
+
+        // Initialize the Google Identity Services token client
+        function initGoogleClient() {
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: '83569280632-cm18f1t47u46tea0dfj667osl21p72h3.apps.googleusercontent.com',
+                    scope: 'https://www.googleapis.com/auth/drive.file',
+                    callback: (tokenResponse) => {
+                        if (tokenResponse.error !== undefined) {
+                            alert("Google Authentication failed!");
+                            console.error(tokenResponse);
+                            return;
+                        }
+                        googleAccessToken = tokenResponse.access_token;
+                        proceedUpload();
+                    },
+                });
+            } catch (err) {
+                console.error("Failed to initialize Google Auth Client:", err);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'centre_incharge', 'project_director', 'ceo']);
             if (!isSessionValid) return;
@@ -125,9 +152,36 @@
                 window.Auth.signOut();
             });
 
+            await loadEventsDropdown();
             await loadEvidenceRegistry();
             window.Permissions.applyUIRules();
         });
+
+        async function loadEventsDropdown() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: events, error } = await window.supabaseClient
+                    .from('events')
+                    .select('id, name, event_code')
+                    .neq('status', 'ARCHIVED')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const select = document.getElementById('evidenceEvent');
+                select.innerHTML = '<option value="">Select Event...</option>';
+                if (events && events.length > 0) {
+                    events.forEach(e => {
+                        const opt = document.createElement('option');
+                        opt.value = e.id;
+                        opt.textContent = `${e.name} (${e.event_code})`;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error("Error loading events for dropdown:", err);
+            }
+        }
 
         async function loadEvidenceRegistry() {
             if (!window.supabaseClient) return;
@@ -151,7 +205,6 @@
                     const tr = document.createElement('tr');
                     
                     let actionHtml = '';
-                    const profile = window.Auth.getUserProfile();
                     const isAdm = window.Auth.hasRole(['super_admin', 'prog_admin']);
                     
                     if (isAdm) {
@@ -161,11 +214,17 @@
                         `;
                     }
 
+                    // Check if path is a URL (starts with http) or a legacy path string
+                    const isUrl = item.storage_path && item.storage_path.startsWith('http');
+                    const linkHtml = isUrl 
+                        ? `<a href="${escapeHTML(item.storage_path)}" target="_blank" style="color: var(--primary); text-decoration: underline; font-weight: bold;">View File ↗</a>` 
+                        : `<span style="color: var(--text-muted);">${escapeHTML(item.storage_path || 'No link')}</span>`;
+
                     tr.innerHTML = `
                         <td><strong>${escapeHTML(item.events ? item.events.name : 'Saksharta Challenge')}</strong></td>
                         <td>${escapeHTML(item.evidence_type)}</td>
                         <td>${escapeHTML(item.file_name)}</td>
-                        <td><a href="#" style="color: var(--primary); text-decoration: underline;" onclick="alert('Viewing: ${escapeHTML(item.storage_path)}')">${escapeHTML(item.storage_path)}</a></td>
+                        <td>${linkHtml}</td>
                         <td><span class="badge badge-${item.verification_status.toLowerCase()}">${item.verification_status}</span></td>
                         ${isAdm ? `<td>${actionHtml}</td>` : ''}
                     `;
@@ -178,24 +237,53 @@
             }
         }
 
-        async function uploadEvidenceRecord(event) {
+        function handleEvidenceFormSubmit(event) {
             event.preventDefault();
             if (!window.supabaseClient) return;
 
-            const profile = window.Auth.getUserProfile();
-            const eventId = document.getElementById('evidenceEvent').value;
-            const type = document.getElementById('evidenceType').value;
-            const name = document.getElementById('fileName').value.trim();
-            const url = document.getElementById('fileUrl').value.trim();
+            const fileInput = document.getElementById('evidenceFile');
+            if (fileInput.files.length === 0) {
+                alert("Please select a file to upload.");
+                return;
+            }
+            pendingUploadFile = fileInput.files[0];
+
+            // If we already have a Google token, use it. Otherwise login first.
+            if (googleAccessToken) {
+                proceedUpload();
+            } else {
+                if (tokenClient) {
+                    tokenClient.requestAccessToken({ prompt: 'consent' });
+                } else {
+                    alert("Google Client not initialized. Please ensure script accounts.google.com is loaded.");
+                }
+            }
+        }
+
+        async function proceedUpload() {
+            if (!pendingUploadFile || !googleAccessToken) return;
+
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading to Google Drive...';
 
             try {
+                // 1. Upload to Google Drive folder and set viewer permissions
+                const shareLink = await uploadToGoogleDrive(pendingUploadFile, googleAccessToken);
+
+                // 2. Insert evidence record with Google Drive share link into Supabase
+                const profile = window.Auth.getUserProfile();
+                const eventId = document.getElementById('evidenceEvent').value;
+                const type = document.getElementById('evidenceType').value;
+                const name = document.getElementById('fileName').value.trim();
+
                 const { error: insErr } = await window.supabaseClient
                     .from('evidence')
                     .insert({
                         event_id: eventId,
                         evidence_type: type,
                         file_name: name,
-                        storage_path: url,
+                        storage_path: shareLink,
                         uploaded_by: profile.id,
                         centre_id: profile.centre_id,
                         verification_status: 'PENDING'
@@ -203,14 +291,72 @@
 
                 if (insErr) throw insErr;
 
-                alert('Evidence submitted for validation!');
+                alert('Evidence successfully uploaded to Google Drive & submitted for verification!');
                 document.getElementById('uploadEvidenceForm').reset();
+                pendingUploadFile = null;
                 await loadEvidenceRegistry();
 
             } catch (err) {
-                console.error("Error uploading evidence:", err);
-                alert("Error saving record: " + err.message);
+                console.error("Upload process failed:", err);
+                alert("Upload failed: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Upload & Submit Evidence';
             }
+        }
+
+        async function uploadToGoogleDrive(file, accessToken) {
+            // Upload configuration
+            const metadata = {
+                name: file.name,
+                mimeType: file.type,
+                parents: ['1xNfshBwQqqsridUIpNFSR7b3i664M4ef'] // Google Drive folder ID
+            };
+
+            const formData = new FormData();
+            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            formData.append('file', file);
+
+            // Step 1: Upload the file data
+            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+                method: 'POST',
+                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+                body: formData
+            });
+
+            if (!uploadResponse.ok) {
+                const errText = await uploadResponse.text();
+                throw new Error('Google Drive API error: ' + errText);
+            }
+
+            const fileData = await uploadResponse.json();
+            const fileId = fileData.id;
+
+            // Step 2: Set permissions so "Anyone with link can view" to let judges see it
+            await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+                method: 'POST',
+                headers: new Headers({
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                }),
+                body: JSON.stringify({
+                    role: 'reader',
+                    type: 'anyone'
+                })
+            });
+
+            // Step 3: Fetch the share webViewLink
+            const infoResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=webViewLink`, {
+                method: 'GET',
+                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
+            });
+
+            if (!infoResponse.ok) {
+                throw new Error('Failed to retrieve Google Drive web view link.');
+            }
+
+            const infoData = await infoResponse.json();
+            return infoData.webViewLink;
         }
 
         async function verifyEvidence(id, status) {
