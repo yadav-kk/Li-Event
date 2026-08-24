@@ -68,23 +68,32 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Evidence Type</label>
-                                <select id="evidenceType" class="form-control" required>
-                                    <option value="Answer Sheet">Answer Sheet PDF</option>
-                                    <option value="Event Photo">Event Photography</option>
-                                    <option value="Consent Form">Parent Consent Form</option>
-                                    <option value="Other">Other Document</option>
+                                <label class="form-label">Participant (Optional for general evidence)</label>
+                                <select id="evidenceParticipant" class="form-control">
+                                    <option value="">-- General Event Level --</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
+                                <label class="form-label">Evidence Type</label>
+                                <select id="evidenceType" class="form-control" required>
+                                    <option value="Answer Sheet">Answer Sheet PDF</option>
+                                    <option value="Event Photo">Event Photography</option>
+                                    <option value="Consent Form">Parent Consent Form</option>
+                                    <option value="Activity Video">Activity Video</option>
+                                    <option value="Other">Other Document</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">File Description / Name</label>
                                 <input type="text" id="fileName" class="form-control" placeholder="e.g. Noida Spelling Test Sheets" required>
                             </div>
+                        </div>
+                        <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Select File to Upload (Google Drive)</label>
-                                <input type="file" id="evidenceFile" class="form-control" required>
+                                <label class="form-label">Select File to Upload (Google Drive - Max 100MB)</label>
+                                <input type="file" id="evidenceFile" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.mp4,.mov,.avi,.m4v,.mkv" required>
                             </div>
                         </div>
                         <button type="submit" id="uploadBtn" class="btn btn-primary" style="margin-top: 8px;">Upload & Submit Evidence</button>
@@ -97,6 +106,7 @@
                             <thead>
                                 <tr>
                                     <th>Event</th>
+                                    <th>Participant</th>
                                     <th>Type</th>
                                     <th>File Name</th>
                                     <th>View Document</th>
@@ -105,7 +115,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching evidence...</td></tr>
+                                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Fetching evidence...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -152,6 +162,9 @@
                 window.Auth.signOut();
             });
 
+            // Listeners
+            document.getElementById('evidenceEvent').addEventListener('change', loadParticipantsDropdown);
+
             await loadEventsDropdown();
             await loadEvidenceRegistry();
             window.Permissions.applyUIRules();
@@ -183,13 +196,60 @@
             }
         }
 
+        async function loadParticipantsDropdown() {
+            if (!window.supabaseClient) return;
+
+            const eventId = document.getElementById('evidenceEvent').value;
+            const select = document.getElementById('evidenceParticipant');
+            select.innerHTML = '<option value="">-- General Event Level --</option>';
+
+            if (!eventId) return;
+
+            try {
+                select.innerHTML = '<option value="">Loading Participants...</option>';
+                
+                // Get the user's centre_id
+                const profile = window.Auth.getUserProfile();
+                const centreId = profile.centre_id;
+
+                // Query event_participants registered under this event and matching the user's centre
+                let query = window.supabaseClient
+                    .from('event_participants')
+                    .select('id, students!inner(name, student_id, centre_id)')
+                    .eq('event_id', eventId);
+
+                if (centreId) {
+                    query = query.eq('students.centre_id', centreId);
+                }
+
+                const { data: participants, error } = await query;
+                if (error) throw error;
+
+                select.innerHTML = '<option value="">-- General Event Level --</option>';
+                if (participants && participants.length > 0) {
+                    participants.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = `${p.students.name} (${p.students.student_id})`;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">-- No Enrolled Participants in Your Centre --</option>';
+                }
+            } catch (err) {
+                console.error("Error loading participants for dropdown:", err);
+                select.innerHTML = '<option value="">-- Error Loading Participants --</option>';
+            }
+        }
+
         async function loadEvidenceRegistry() {
             if (!window.supabaseClient) return;
 
             try {
                 const { data: evidence, error: err } = await window.supabaseClient
                     .from('evidence')
-                    .select('*, events(name)');
+                    .select('*, events(name), event_participants(students(name, student_id))')
+                    .order('created_at', { ascending: false });
 
                 if (err) throw err;
 
@@ -197,7 +257,7 @@
                 tbody.innerHTML = '';
 
                 if (!evidence || evidence.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No evidence uploaded yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No evidence uploaded yet.</td></tr>`;
                     return;
                 }
 
@@ -220,8 +280,12 @@
                         ? `<a href="${escapeHTML(item.storage_path)}" target="_blank" style="color: var(--primary); text-decoration: underline; font-weight: bold;">View File ↗</a>` 
                         : `<span style="color: var(--text-muted);">${escapeHTML(item.storage_path || 'No link')}</span>`;
 
+                    const ep = item.event_participants;
+                    const studentName = ep && ep.students ? `${ep.students.name} (${ep.students.student_id})` : 'General Event';
+
                     tr.innerHTML = `
                         <td><strong>${escapeHTML(item.events ? item.events.name : 'Saksharta Challenge')}</strong></td>
+                        <td><span style="font-size: 0.85rem; color: #4b5563;">${escapeHTML(studentName)}</span></td>
                         <td>${escapeHTML(item.evidence_type)}</td>
                         <td>${escapeHTML(item.file_name)}</td>
                         <td>${linkHtml}</td>
@@ -247,6 +311,14 @@
                 return;
             }
             pendingUploadFile = fileInput.files[0];
+
+            // Validate file size limit: 100 MB = 100 * 1024 * 1024 bytes = 104,857,600 bytes
+            const maxSize = 100 * 1024 * 1024;
+            if (pendingUploadFile.size > maxSize) {
+                alert("File upload rejected: File size exceeds the 100 MB limit.");
+                pendingUploadFile = null;
+                return;
+            }
 
             // If we already have a Google token, use it. Otherwise login first.
             if (googleAccessToken) {
@@ -274,6 +346,7 @@
                 // 2. Insert evidence record with Google Drive share link into Supabase
                 const profile = window.Auth.getUserProfile();
                 const eventId = document.getElementById('evidenceEvent').value;
+                const participantId = document.getElementById('evidenceParticipant').value || null;
                 const type = document.getElementById('evidenceType').value;
                 const name = document.getElementById('fileName').value.trim();
 
@@ -286,6 +359,7 @@
                         storage_path: shareLink,
                         uploaded_by: profile.id,
                         centre_id: profile.centre_id,
+                        participant_id: participantId,
                         verification_status: 'PENDING'
                     });
 
@@ -294,6 +368,10 @@
                 alert('Evidence successfully uploaded to Google Drive & submitted for verification!');
                 document.getElementById('uploadEvidenceForm').reset();
                 pendingUploadFile = null;
+                
+                // Reset participant dropdown
+                document.getElementById('evidenceParticipant').innerHTML = '<option value="">-- General Event Level --</option>';
+
                 await loadEvidenceRegistry();
 
             } catch (err) {
