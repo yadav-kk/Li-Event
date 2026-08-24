@@ -340,16 +340,33 @@
             btn.textContent = 'Uploading to Google Drive...';
 
             try {
-                // 1. Upload to Google Drive folder and set viewer permissions
-                const shareLink = await uploadToGoogleDrive(pendingUploadFile, googleAccessToken);
-
-                // 2. Insert evidence record with Google Drive share link into Supabase
                 const profile = window.Auth.getUserProfile();
                 const eventId = document.getElementById('evidenceEvent').value;
                 const participantId = document.getElementById('evidenceParticipant').value || null;
                 const type = document.getElementById('evidenceType').value;
                 const name = document.getElementById('fileName').value.trim();
 
+                // Get clean Event Name from selector
+                const eventSelect = document.getElementById('evidenceEvent');
+                const eventName = eventSelect.options[eventSelect.selectedIndex].text.split(' (')[0].trim();
+
+                // Fetch Centre Name based on user's profile
+                let centreName = 'Admin Uploads';
+                if (profile.centre_id) {
+                    const { data: centreData } = await window.supabaseClient
+                        .from('centres')
+                        .select('centre_name')
+                        .eq('id', profile.centre_id)
+                        .single();
+                    if (centreData) {
+                        centreName = centreData.centre_name;
+                    }
+                }
+
+                // 1. Upload to Google Drive folder and set viewer permissions
+                const shareLink = await uploadToGoogleDrive(pendingUploadFile, name, eventName, centreName, googleAccessToken);
+
+                // 2. Insert evidence record with Google Drive share link into Supabase
                 const { error: insErr } = await window.supabaseClient
                     .from('evidence')
                     .insert({
@@ -383,19 +400,75 @@
             }
         }
 
-        async function uploadToGoogleDrive(file, accessToken) {
-            // Upload configuration
+        async function getOrCreateFolder(folderName, parentId, accessToken) {
+            const query = `name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`;
+            
+            const response = await fetch(searchUrl, {
+                method: 'GET',
+                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to search folder: ' + folderName);
+            }
+            
+            const data = await response.json();
+            if (data.files && data.files.length > 0) {
+                return data.files[0].id;
+            }
+            
+            const createUrl = 'https://www.googleapis.com/drive/v3/files';
             const metadata = {
-                name: file.name,
+                name: folderName,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: [parentId]
+            };
+            
+            const createResponse = await fetch(createUrl, {
+                method: 'POST',
+                headers: new Headers({
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                }),
+                body: JSON.stringify(metadata)
+            });
+            
+            if (!createResponse.ok) {
+                const errText = await createResponse.text();
+                throw new Error('Failed to create folder: ' + folderName + ' (' + errText + ')');
+            }
+            
+            const folderData = await createResponse.json();
+            return folderData.id;
+        }
+
+        async function uploadToGoogleDrive(file, descName, eventName, centreName, accessToken) {
+            const rootFolderId = '1xNfshBwQqqsridUIpNFSR7b3i664M4ef';
+            
+            // 1. Get or create Event folder
+            const eventFolderId = await getOrCreateFolder(eventName, rootFolderId, accessToken);
+            
+            // 2. Get or create Centre folder inside Event folder
+            const centreFolderId = await getOrCreateFolder(centreName, eventFolderId, accessToken);
+
+            // 3. Prepare clean filename based on form description + original extension
+            const originalName = file.name;
+            const extIndex = originalName.lastIndexOf('.');
+            const ext = extIndex !== -1 ? originalName.substring(extIndex) : '';
+            const newFileName = `${descName}${ext}`;
+
+            const metadata = {
+                name: newFileName,
                 mimeType: file.type,
-                parents: ['1xNfshBwQqqsridUIpNFSR7b3i664M4ef'] // Google Drive folder ID
+                parents: [centreFolderId]
             };
 
             const formData = new FormData();
             formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             formData.append('file', file);
 
-            // Step 1: Upload the file data
+            // Step 4: Upload the file data
             const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
                 method: 'POST',
                 headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
@@ -410,7 +483,7 @@
             const fileData = await uploadResponse.json();
             const fileId = fileData.id;
 
-            // Step 2: Set permissions so "Anyone with link can view" to let judges see it
+            // Step 5: Set permissions so "Anyone with link can view" to let judges see it
             await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
                 method: 'POST',
                 headers: new Headers({
@@ -423,7 +496,7 @@
                 })
             });
 
-            // Step 3: Fetch the share webViewLink
+            // Step 6: Fetch the share webViewLink
             const infoResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=webViewLink`, {
                 method: 'GET',
                 headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
