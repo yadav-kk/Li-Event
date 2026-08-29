@@ -222,7 +222,7 @@
                 // 3. Fetch Stage Participants
                 // Filter participants dynamically by the judge's assigned centre(s)
                 const profile = window.Auth.getUserProfile();
-                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo']);
+                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo', 'final_judge']);
                 const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
                 const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
 
@@ -337,7 +337,7 @@
                 // Dynamic inputs for each criteria
                 criteriaList.forEach(crit => {
                     const scoreVal = rec.criteria[crit.id] !== undefined ? rec.criteria[crit.id] : '';
-                    const isLocked = rec.status === 'LOCKED' || rec.status === 'SUBMITTED';
+                    const isLocked = (rec.status === 'LOCKED' || rec.status === 'SUBMITTED') && !isSuperEventScope;
                     
                     html += `
                         <td>
@@ -356,7 +356,7 @@
                     `;
                 });
 
-                const isLocked = rec.status === 'LOCKED' || rec.status === 'SUBMITTED';
+                const isLocked = (rec.status === 'LOCKED' || rec.status === 'SUBMITTED') && !isSuperEventScope;
                 
                 html += `
                     <td>

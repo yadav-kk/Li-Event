@@ -375,6 +375,19 @@
 
             let filtered = [...allEvidenceRecords];
 
+            // Restrict centre_incharge to only view uploads associated with their centre
+            const profile = window.Auth.getUserProfile();
+            const isAdm = window.Auth.hasRole(['super_admin', 'prog_admin', 'academic_lead', 'coordinator', 'management', 'project_director', 'ceo']);
+            
+            if (!isAdm && profile && profile.centre_id) {
+                filtered = filtered.filter(item => {
+                    const studentCentreId = item.event_participants && item.event_participants.students 
+                        ? item.event_participants.students.centre_id 
+                        : item.centre_id;
+                    return studentCentreId === profile.centre_id;
+                });
+            }
+
             if (eventVal) {
                 filtered = filtered.filter(item => item.event_id === eventVal);
             }
@@ -480,7 +493,16 @@
                             shortlistHtml = `<span class="badge badge-${badgeClass}">${status}</span>`;
                         }
                     } else {
-                        shortlistHtml = '<span style="color: var(--text-muted);">Not in Stage 1</span>';
+                        // Not registered in Stage 1 yet
+                        const isEvaluator = window.Auth.hasRole(['super_admin', 'prog_admin', 'academic_lead', 'coordinator', 'project_director', 'ceo']);
+                        if (isEvaluator && stage1Id) {
+                            shortlistHtml = `
+                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background-color: var(--success); color: white; border: none; cursor: pointer;" 
+                                    onclick="registerAndShortlist('${ep.id}', '${stage1Id}')">Shortlist</button>
+                            `;
+                        } else {
+                            shortlistHtml = '<span style="color: var(--text-muted);">Not in Stage 1</span>';
+                        }
                     }
                 }
 
@@ -513,6 +535,29 @@
                 await loadEvidenceRegistry();
             } catch (err) {
                 console.error("Error toggling finalist status:", err);
+                alert("Error: " + err.message);
+            }
+        }
+
+        async function registerAndShortlist(participantId, stage1Id) {
+            if (!window.supabaseClient) return;
+            try {
+                const { error } = await window.supabaseClient
+                    .from('stage_participants')
+                    .insert({
+                        stage_id: stage1Id,
+                        participant_id: participantId,
+                        qualification_status: 'QUALIFIED',
+                        qualification_source: 'Nominated from Video Evidence',
+                        attendance: 'PRESENT'
+                    });
+
+                if (error) throw error;
+
+                alert('Participant registered into Stage 1 and shortlisted as Finalist!');
+                await loadEvidenceRegistry();
+            } catch (err) {
+                console.error("Error registering and shortlisting:", err);
                 alert("Error: " + err.message);
             }
         }

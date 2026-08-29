@@ -75,6 +75,29 @@
                     </div>
                 </div>
 
+                <!-- Admin & Super Judge Configuration Dashboard Card -->
+                <div class="card" id="adminPanelCard" style="margin-bottom: 24px; display: none;">
+                    <div class="card-header">
+                        <h3 class="card-title">Judge Panel Administration & Configuration</h3>
+                    </div>
+                    <div class="table-container" style="border: none; margin-bottom: 0;">
+                        <table class="data-table" id="adminAssessTable">
+                            <thead>
+                                <tr>
+                                    <th>Event & Stage Dates</th>
+                                    <th>Assessment</th>
+                                    <th>Criteria Parameters</th>
+                                    <th>Active Judges (Centres)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading admin details...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </section>
         </main>
     </div>
@@ -92,6 +115,13 @@
             });
 
             await fetchJudgeAssessments();
+            
+            const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'final_judge', 'project_director', 'ceo']);
+            if (isSuper) {
+                document.getElementById('adminPanelCard').style.display = 'block';
+                await fetchAdminAssessments();
+            }
+
             window.Permissions.applyUIRules();
         });
 
@@ -99,13 +129,18 @@
             if (!window.supabaseClient) return;
 
             try {
-                const { data: assessments, error: asErr } = await window.supabaseClient
+                let query = window.supabaseClient
                     .from('event_assessments')
                     .select('*, stage_id!inner(name, status, event_id!inner(name, status))')
                     .eq('status', 'ACTIVE')
-                    .eq('stage_id.event_id.status', 'ASSESSMENT')
                     .order('sequence', { ascending: true });
 
+                const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'final_judge', 'project_director', 'ceo']);
+                if (!isSuper) {
+                    query = query.eq('stage_id.event_id.status', 'ASSESSMENT');
+                }
+
+                const { data: assessments, error: asErr } = await query;
                 if (asErr) throw asErr;
 
                 const hasAdminOverride = window.Auth.hasRole('super_admin');
@@ -161,6 +196,94 @@
 
             } catch (err) {
                 console.error("Error fetching judge assessments:", err);
+            }
+        }
+
+        async function fetchAdminAssessments() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: assessments, error } = await window.supabaseClient
+                    .from('event_assessments')
+                    .select(`
+                        *,
+                        stage_id (name, start_datetime, end_datetime, event_id (name, status)),
+                        assessment_criteria (name, max_marks),
+                        assessment_assignments (
+                            centre_id,
+                            centres (centre_name),
+                            judge_id,
+                            users (name, email)
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const tbody = document.querySelector('#adminAssessTable tbody');
+                tbody.innerHTML = '';
+
+                if (assessments && assessments.length > 0) {
+                    assessments.forEach(a => {
+                        const stage = a.stage_id;
+                        const event = stage ? stage.event_id : null;
+                        const start = stage && stage.start_datetime ? new Date(stage.start_datetime).toLocaleDateString() : 'N/A';
+                        const end = stage && stage.end_datetime ? new Date(stage.end_datetime).toLocaleDateString() : 'N/A';
+                        
+                        const stageInfo = `
+                            <strong>${event ? event.name : 'Unknown Event'}</strong><br>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">${stage ? stage.name : 'Stage'}</span><br>
+                            <small style="color: var(--text-muted);">Active: ${start} to ${end}</small>
+                        `;
+
+                        const assessInfo = `
+                            <strong>${a.name}</strong><br>
+                            <small style="color: var(--text-secondary);">${a.max_marks} Max Marks</small>
+                        `;
+
+                        const criteria = a.assessment_criteria || [];
+                        let criteriaHtml = '';
+                        if (criteria.length > 0) {
+                            criteriaHtml = '<ul style="margin: 0; padding-left: 16px; font-size: 0.85rem; color: #4b5563;">';
+                            criteria.forEach(c => {
+                                criteriaHtml += `<li>${c.name} (${c.max_marks} M)</li>`;
+                            });
+                            criteriaHtml += '</ul>';
+                        } else {
+                            criteriaHtml = '<span style="color: var(--text-muted); font-size: 0.85rem;">No criteria parameters</span>';
+                        }
+
+                        const assignments = a.assessment_assignments || [];
+                        let judgesHtml = '';
+                        if (assignments.length > 0) {
+                            judgesHtml = '<div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem;">';
+                            assignments.forEach(as => {
+                                const judgeName = as.users ? as.users.name : 'Unknown Judge';
+                                const centreName = as.centres ? as.centres.centre_name : 'All Centres';
+                                judgesHtml += `<div>👤 <strong>${judgeName}</strong> (${centreName})</div>`;
+                            });
+                            judgesHtml += '</div>';
+                        } else {
+                            judgesHtml = '<span style="color: var(--text-muted); font-size: 0.85rem;">No judges assigned</span>';
+                        }
+
+                        const actionHtml = `<a href="score-entry.html?assessment_id=${a.id}" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.8rem;">Override/View Scores</a>`;
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${stageInfo}</td>
+                            <td>${assessInfo}</td>
+                            <td>${criteriaHtml}</td>
+                            <td>${judgesHtml}</td>
+                            <td>${actionHtml}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No assessments configured in the system.</td></tr>';
+                }
+            } catch (err) {
+                console.error("Error loading admin assessments:", err);
+                document.querySelector('#adminAssessTable tbody').innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--danger);">Failed to load admin assessments.</td></tr>';
             }
         }
     </script>
