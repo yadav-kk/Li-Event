@@ -132,7 +132,7 @@
                 // 1. Fetch assessment configuration details
                 const { data: assess, error: assErr } = await window.supabaseClient
                     .from('event_assessments')
-                    .select('*, stage_id!inner(name, event_id!inner(name))')
+                    .select('*, stage_id!inner(id, name, event_id!inner(name))')
                     .eq('id', assessmentId)
                     .single();
 
@@ -260,7 +260,7 @@
                 let query = window.supabaseClient
                     .from('stage_participants')
                     .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id))')
-                    .eq('stage_id', assess.stage_id);
+                    .eq('stage_id', assess.stage_id.id);
 
                 if (!isSuperEventScope) {
                     if (isPDOrCoord || (isJudge && allowedCentreIds.length > 0)) {
