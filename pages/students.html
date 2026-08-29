@@ -241,7 +241,7 @@
             document.getElementById('enrollStudentForm').addEventListener('submit', handleSingleRegistration);
             document.getElementById('filterCentre').addEventListener('change', loadStudentsList);
             document.getElementById('filterEvent').addEventListener('change', loadStudentsList);
-            document.getElementById('searchRoster').addEventListener('input', handleSearchAndFilter);
+            document.getElementById('searchRoster').addEventListener('input', debounceSearchAndFilter);
             document.getElementById('csvFileInput').addEventListener('change', handleCSVFileSelect);
 
 
@@ -382,6 +382,14 @@
             }
         }
 
+        let searchFilterTimeout;
+        function debounceSearchAndFilter() {
+            clearTimeout(searchFilterTimeout);
+            searchFilterTimeout = setTimeout(() => {
+                handleSearchAndFilter();
+            }, 300);
+        }
+
         function handleSearchAndFilter() {
             const query = document.getElementById('searchRoster').value.toLowerCase().trim();
             if (!query) {
@@ -405,6 +413,7 @@
             const canDelete = window.Auth.hasRole(['coordinator', 'super_admin', 'prog_admin']);
 
             if (studentsList && studentsList.length > 0) {
+                const fragment = document.createDocumentFragment();
                 studentsList.forEach(s => {
                     const eventName = s.event_participants && s.event_participants[0] && s.event_participants[0].events ? s.event_participants[0].events.name : 'N/A';
                     
@@ -431,8 +440,9 @@
                         <td><span class="badge badge-completed">${s.status}</span></td>
                         <td>${actionsHtml}</td>
                     `;
-                    tbody.appendChild(tr);
+                    fragment.appendChild(tr);
                 });
+                tbody.appendChild(fragment);
             } else {
                 tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No participant records found.</td></tr>`;
             }
@@ -856,6 +866,7 @@
                 }
 
                 let currentCount = maxSerial;
+                const studentsToInsert = [];
 
                 for (const row of importedParsedRows) {
                     // 1. Resolve Centre ID from Code
@@ -870,52 +881,68 @@
                     const nextSerial = currentCount.toString().padStart(4, '0');
                     const studentIdCode = `${eventCode}-${nextSerial}`;
 
-                    // Insert student
-                    const { data: student, error: insErr } = await window.supabaseClient
-                        .from('students')
-                        .insert({
-                            student_id: studentIdCode,
-                            name: row.name,
-                            gender: row.gender,
-                            class: row.targetClass,
-                            centre_id: matchingCentre.id,
-                            program_id: programIdVal,
-                            guardian_name: row.guardName,
-                            guardian_mobile: row.guardMobile,
-                            language: row.lang,
-                            status: 'active'
-                        })
-                        .select()
-                        .single();
-
-                    if (insErr) throw insErr;
-
-                    // Register to selected Event
-                    const { data: eventPart, error: regErr } = await window.supabaseClient
-                        .from('event_participants')
-                        .insert({
-                            event_id: eventId,
-                            student_id: student.id,
-                            registration_number: studentIdCode,
-                            registration_status: 'APPROVED',
-                            eligibility_status: 'ELIGIBLE',
-                            current_stage_id: stageId
-                        })
-                        .select()
-                        .single();
-
-                    if (regErr) throw regErr;
-
-                    // Stage 1 bind
-                    await window.supabaseClient
-                        .from('stage_participants')
-                        .insert({
-                            stage_id: stageId,
-                            participant_id: eventPart.id,
-                            qualification_status: 'PENDING',
-                            attendance: 'PRESENT'
-                        });
+                    studentsToInsert.push({
+                        student_id: studentIdCode,
+                        name: row.name,
+                        gender: row.gender,
+                        class: row.targetClass,
+                        centre_id: matchingCentre.id,
+                        program_id: programIdVal,
+                        guardian_name: row.guardName,
+                        guardian_mobile: row.guardMobile,
+                        language: row.lang,
+                        status: 'active'
+                    });
                 }
+
+                if (studentsToInsert.length === 0) {
+                    alert("No valid rows to import. Ensure Centre Codes are correct.");
+                    const btn = document.getElementById('confirmImportBtn');
+                    btn.disabled = false;
+                    btn.textContent = 'Execute Import';
+                    return;
+                }
+
+                // Batch Insert 1: Students
+                const { data: insertedStudents, error: insErr } = await window.supabaseClient
+                    .from('students')
+                    .insert(studentsToInsert)
+                    .select();
+
+                if (insErr) throw insErr;
+
+                // Build Event Participants payload
+                const eventPartsToInsert = insertedStudents.map(student => ({
+                    event_id: eventId,
+                    student_id: student.id,
+                    registration_number: student.student_id,
+                    registration_status: 'APPROVED',
+                    eligibility_status: 'ELIGIBLE',
+                    current_stage_id: stageId
+                }));
+
+                // Batch Insert 2: Event Participants
+                const { data: insertedEventParts, error: regErr } = await window.supabaseClient
+                    .from('event_participants')
+                    .insert(eventPartsToInsert)
+                    .select();
+
+                if (regErr) throw regErr;
+
+                // Build Stage Participants payload
+                const stagePartsToInsert = insertedEventParts.map(ep => ({
+                    stage_id: stageId,
+                    participant_id: ep.id,
+                    qualification_status: 'PENDING',
+                    attendance: 'PRESENT'
+                }));
+
+                // Batch Insert 3: Stage Participants
+                const { error: stagePartErr } = await window.supabaseClient
+                    .from('stage_participants')
+                    .insert(stagePartsToInsert);
+
+                if (stagePartErr) throw stagePartErr;
 
                 alert(`Successfully imported ${importedParsedRows.length} student records!`);
                 toggleImportCard();

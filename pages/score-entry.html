@@ -322,6 +322,8 @@
                 return;
             }
 
+            const fragment = document.createDocumentFragment();
+
             participants.forEach(sp => {
                 const sInfo = sp.participant_id.student_id;
                 const rec = scoreRecords[sp.id] || { total_score: 0, remarks: '', status: 'DRAFT', criteria: {} };
@@ -377,8 +379,10 @@
                 `;
 
                 tr.innerHTML = html;
-                tbody.appendChild(tr);
+                fragment.appendChild(tr);
             });
+            
+            tbody.appendChild(fragment);
         }
 
         function updateStudentTotalScore(rowEl) {

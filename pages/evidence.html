@@ -152,7 +152,7 @@
                     <div style="display: flex; gap: 16px; margin: 16px; flex-wrap: wrap; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px;">
                         <div style="flex: 1; min-width: 200px;">
                             <label class="form-label" for="searchEvidence" style="font-size: 0.85rem;">Search Name / ID / File Description</label>
-                            <input type="text" id="searchEvidence" class="form-control" placeholder="Search participant name, ID, or description..." oninput="applyFilters()">
+                            <input type="text" id="searchEvidence" class="form-control" placeholder="Search participant name, ID, or description..." oninput="debounceApplyFilters()">
                         </div>
                         <div style="width: 200px; min-width: 150px;">
                             <label class="form-label" for="filterEventGrid" style="font-size: 0.85rem;">Filter Event</label>
@@ -368,6 +368,14 @@
             }
         }
 
+        let applyFiltersTimeout;
+        function debounceApplyFilters() {
+            clearTimeout(applyFiltersTimeout);
+            applyFiltersTimeout = setTimeout(() => {
+                applyFilters();
+            }, 300);
+        }
+
         function applyFilters() {
             const eventVal = document.getElementById('filterEventGrid').value;
             const centreVal = document.getElementById('filterCentreGrid').value;
@@ -426,6 +434,7 @@
                 return;
             }
 
+            const fragment = document.createDocumentFragment();
             evidence.forEach(item => {
                 const tr = document.createElement('tr');
                 
@@ -517,8 +526,9 @@
                     <td><span class="badge badge-${item.verification_status.toLowerCase()}">${item.verification_status}</span></td>
                     ${isAdm ? `<td>${actionHtml}</td>` : ''}
                 `;
-                tbody.appendChild(tr);
+                fragment.appendChild(tr);
             });
+            tbody.appendChild(fragment);
         }
 
         async function toggleShortlist(spId, newStatus) {
