@@ -17,6 +17,45 @@
 
     <!-- Google Identity Services client library -->
     <script src="https://accounts.google.com/gsi/client" onload="initGoogleClient()" async defer></script>
+
+    <!-- Custom Print CSS Styling -->
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .app-main, .app-main * {
+                visibility: visible;
+            }
+            .app-sidebar, #uploadCard, .app-header p, .header-title p, .logout-btn, button, .footer-note, .card-header button, div[style*="border-bottom"] {
+                display: none !important;
+            }
+            .app-main {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            th, td {
+                border: 1px solid #ddd !important;
+                padding: 8px !important;
+                font-size: 11px !important;
+                text-align: left;
+            }
+            th {
+                background-color: #f3f4f6 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
 </head>
 <body>
 
@@ -101,21 +140,51 @@
                 </div>
 
                 <div class="card">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <span class="card-title">Evidence & Uploads Directory</span>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="exportEvidenceToCSV()" style="padding: 6px 12px; font-size: 0.9rem;">Export CSV</button>
+                            <button class="btn btn-secondary" onclick="window.print()" style="padding: 6px 12px; font-size: 0.9rem;">Print Report</button>
+                        </div>
+                    </div>
+
+                    <!-- Directory Filters Section -->
+                    <div style="display: flex; gap: 16px; margin: 16px; flex-wrap: wrap; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label class="form-label" for="searchEvidence" style="font-size: 0.85rem;">Search Name / ID / File Description</label>
+                            <input type="text" id="searchEvidence" class="form-control" placeholder="Search participant name, ID, or description..." oninput="applyFilters()">
+                        </div>
+                        <div style="width: 200px; min-width: 150px;">
+                            <label class="form-label" for="filterEventGrid" style="font-size: 0.85rem;">Filter Event</label>
+                            <select id="filterEventGrid" class="form-control" onchange="applyFilters()">
+                                <option value="">All Events</option>
+                            </select>
+                        </div>
+                        <div style="width: 200px; min-width: 150px;">
+                            <label class="form-label" for="filterCentreGrid" style="font-size: 0.85rem;">Filter Centre</label>
+                            <select id="filterCentreGrid" class="form-control" onchange="applyFilters()">
+                                <option value="">Loading Centres...</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="table-container" style="border: none; margin-bottom: 0;">
                         <table class="data-table" id="allEvidenceTable">
                             <thead>
                                 <tr>
                                     <th>Event</th>
                                     <th>Participant</th>
+                                    <th>Centre</th>
                                     <th>Type</th>
                                     <th>File Name</th>
                                     <th>View Document</th>
+                                    <th>Shortlist Status</th>
                                     <th>Verification Status</th>
                                     <th data-allowed-roles="super_admin, prog_admin">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Fetching evidence...</td></tr>
+                                <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Fetching evidence...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -132,6 +201,9 @@
         let tokenClient;
         let googleAccessToken = null;
         let pendingUploadFile = null;
+
+        let loadedCentres = [];
+        let allEvidenceRecords = [];
 
         // Initialize the Google Identity Services token client
         function initGoogleClient() {
@@ -165,10 +237,35 @@
             // Listeners
             document.getElementById('evidenceEvent').addEventListener('change', loadParticipantsDropdown);
 
+            await loadCentresList();
             await loadEventsDropdown();
             await loadEvidenceRegistry();
             window.Permissions.applyUIRules();
         });
+
+        async function loadCentresList() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data, error } = await window.supabaseClient
+                    .from('centres')
+                    .select('id, centre_name')
+                    .order('centre_name');
+                if (error) throw error;
+                loadedCentres = data || [];
+                
+                // Populate filter dropdown
+                const select = document.getElementById('filterCentreGrid');
+                select.innerHTML = '<option value="">All Centres</option>';
+                loadedCentres.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.centre_name;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                console.error("Error loading centres list:", err);
+            }
+        }
 
         async function loadEventsDropdown() {
             if (!window.supabaseClient) return;
@@ -181,14 +278,23 @@
 
                 if (error) throw error;
 
-                const select = document.getElementById('evidenceEvent');
-                select.innerHTML = '<option value="">Select Event...</option>';
+                const selectUpload = document.getElementById('evidenceEvent');
+                const selectFilter = document.getElementById('filterEventGrid');
+
+                selectUpload.innerHTML = '<option value="">Select Event...</option>';
+                selectFilter.innerHTML = '<option value="">All Events</option>';
+
                 if (events && events.length > 0) {
                     events.forEach(e => {
-                        const opt = document.createElement('option');
-                        opt.value = e.id;
-                        opt.textContent = `${e.name} (${e.event_code})`;
-                        select.appendChild(opt);
+                        const optUpload = document.createElement('option');
+                        optUpload.value = e.id;
+                        optUpload.textContent = `${e.name} (${e.event_code})`;
+                        selectUpload.appendChild(optUpload);
+
+                        const optFilter = document.createElement('option');
+                        optFilter.value = e.id;
+                        optFilter.textContent = `${e.name} (${e.event_code})`;
+                        selectFilter.appendChild(optFilter);
                     });
                 }
             } catch (err) {
@@ -248,56 +354,166 @@
             try {
                 const { data: evidence, error: err } = await window.supabaseClient
                     .from('evidence')
-                    .select('*, events(name), event_participants(students(name, student_id))')
+                    .select('*, events(name, event_stages(id, sequence)), event_participants(id, students(name, student_id, centre_id, centres(centre_name)), stage_participants(id, stage_id, qualification_status))')
                     .order('created_at', { ascending: false });
 
                 if (err) throw err;
 
-                const tbody = document.querySelector('#allEvidenceTable tbody');
-                tbody.innerHTML = '';
-
-                if (!evidence || evidence.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No evidence uploaded yet.</td></tr>`;
-                    return;
-                }
-
-                evidence.forEach(item => {
-                    const tr = document.createElement('tr');
-                    
-                    let actionHtml = '';
-                    const isAdm = window.Auth.hasRole(['super_admin', 'prog_admin']);
-                    
-                    if (isAdm) {
-                        actionHtml = `
-                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="verifyEvidence('${item.id}', 'VERIFIED')">Verify</button>
-                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="verifyEvidence('${item.id}', 'REJECTED')">Reject</button>
-                        `;
-                    }
-
-                    // Check if path is a URL (starts with http) or a legacy path string
-                    const isUrl = item.storage_path && item.storage_path.startsWith('http');
-                    const linkHtml = isUrl 
-                        ? `<a href="${escapeHTML(item.storage_path)}" target="_blank" style="color: var(--primary); text-decoration: underline; font-weight: bold;">View File ↗</a>` 
-                        : `<span style="color: var(--text-muted);">${escapeHTML(item.storage_path || 'No link')}</span>`;
-
-                    const ep = item.event_participants;
-                    const studentName = ep && ep.students ? `${ep.students.name} (${ep.students.student_id})` : 'General Event';
-
-                    tr.innerHTML = `
-                        <td><strong>${escapeHTML(item.events ? item.events.name : 'Saksharta Challenge')}</strong></td>
-                        <td><span style="font-size: 0.85rem; color: #4b5563;">${escapeHTML(studentName)}</span></td>
-                        <td>${escapeHTML(item.evidence_type)}</td>
-                        <td>${escapeHTML(item.file_name)}</td>
-                        <td>${linkHtml}</td>
-                        <td><span class="badge badge-${item.verification_status.toLowerCase()}">${item.verification_status}</span></td>
-                        ${isAdm ? `<td>${actionHtml}</td>` : ''}
-                    `;
-                    tbody.appendChild(tr);
-                });
+                allEvidenceRecords = evidence || [];
+                applyFilters();
 
             } catch (error) {
                 console.error("Error loading evidence:", error);
                 alert("Error loading evidence logs.");
+            }
+        }
+
+        function applyFilters() {
+            const eventVal = document.getElementById('filterEventGrid').value;
+            const centreVal = document.getElementById('filterCentreGrid').value;
+            const searchVal = document.getElementById('searchEvidence').value.toLowerCase().trim();
+
+            let filtered = [...allEvidenceRecords];
+
+            if (eventVal) {
+                filtered = filtered.filter(item => item.event_id === eventVal);
+            }
+
+            if (centreVal) {
+                filtered = filtered.filter(item => {
+                    const studentCentreId = item.event_participants && item.event_participants.students 
+                        ? item.event_participants.students.centre_id 
+                        : item.centre_id;
+                    return studentCentreId === centreVal;
+                });
+            }
+
+            if (searchVal) {
+                filtered = filtered.filter(item => {
+                    const studentName = item.event_participants && item.event_participants.students
+                        ? item.event_participants.students.name.toLowerCase()
+                        : '';
+                    const studentId = item.event_participants && item.event_participants.students
+                        ? item.event_participants.students.student_id.toLowerCase()
+                        : '';
+                    const fileName = item.file_name.toLowerCase();
+                    return studentName.includes(searchVal) || studentId.includes(searchVal) || fileName.includes(searchVal);
+                });
+            }
+
+            renderEvidenceTable(filtered);
+        }
+
+        function renderEvidenceTable(evidence) {
+            const tbody = document.querySelector('#allEvidenceTable tbody');
+            tbody.innerHTML = '';
+
+            if (!evidence || evidence.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No matching evidence found.</td></tr>`;
+                return;
+            }
+
+            evidence.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                let actionHtml = '';
+                const isAdm = window.Auth.hasRole(['super_admin', 'prog_admin']);
+                
+                if (isAdm) {
+                    actionHtml = `
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="verifyEvidence('${item.id}', 'VERIFIED')">Verify</button>
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="verifyEvidence('${item.id}', 'REJECTED')">Reject</button>
+                    `;
+                }
+
+                // Check if path is a URL (starts with http) or a legacy path string
+                const isUrl = item.storage_path && item.storage_path.startsWith('http');
+                const linkHtml = isUrl 
+                    ? `<a href="${escapeHTML(item.storage_path)}" target="_blank" style="color: var(--primary); text-decoration: underline; font-weight: bold;">View File ↗</a>` 
+                    : `<span style="color: var(--text-muted);">${escapeHTML(item.storage_path || 'No link')}</span>`;
+
+                const ep = item.event_participants;
+                const studentName = ep && ep.students ? `${ep.students.name} (${ep.students.student_id})` : 'General Event';
+                
+                // Get Centre Name
+                let centreName = 'General / Admin';
+                if (ep && ep.students && ep.students.centres) {
+                    centreName = ep.students.centres.centre_name;
+                } else if (item.centre_id) {
+                    const centreObj = loadedCentres.find(c => c.id === item.centre_id);
+                    centreName = centreObj ? centreObj.centre_name : 'General Centre';
+                }
+
+                // Resolve Stage 1 Shortlist Status & Button
+                let shortlistHtml = '<span class="badge badge-draft">General</span>';
+                
+                if (ep) {
+                    const stages = item.events ? item.events.event_stages : [];
+                    const stage1 = stages.find(st => st.sequence === 1);
+                    const stage1Id = stage1 ? stage1.id : null;
+                    const spList = ep.stage_participants || [];
+                    const stage1Participant = stage1Id ? spList.find(sp => sp.stage_id === stage1Id) : null;
+
+                    if (stage1Participant) {
+                        const status = stage1Participant.qualification_status;
+                        const badgeClass = status.toLowerCase();
+                        
+                        // Evaluators can toggle status
+                        const isEvaluator = window.Auth.hasRole(['super_admin', 'prog_admin', 'academic_lead', 'coordinator', 'project_director', 'ceo']);
+                        
+                        if (isEvaluator) {
+                            if (status === 'PENDING') {
+                                shortlistHtml = `
+                                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; background-color: var(--success); color: white; border: none; cursor: pointer;" 
+                                        onclick="toggleShortlist('${stage1Participant.id}', 'QUALIFIED')">Shortlist</button>
+                                `;
+                            } else if (status === 'QUALIFIED') {
+                                shortlistHtml = `
+                                    <span class="badge badge-verified" style="margin-right: 6px;">Shortlisted</span>
+                                    <button class="btn btn-danger" style="padding: 2px 6px; font-size: 0.75rem; border: none; cursor: pointer;" 
+                                        onclick="toggleShortlist('${stage1Participant.id}', 'PENDING')">Undo</button>
+                                `;
+                            } else {
+                                shortlistHtml = `<span class="badge badge-${badgeClass}">${status}</span>`;
+                            }
+                        } else {
+                            shortlistHtml = `<span class="badge badge-${badgeClass}">${status}</span>`;
+                        }
+                    } else {
+                        shortlistHtml = '<span style="color: var(--text-muted);">Not in Stage 1</span>';
+                    }
+                }
+
+                tr.innerHTML = `
+                    <td><strong>${escapeHTML(item.events ? item.events.name : 'Saksharta Challenge')}</strong></td>
+                    <td><span style="font-size: 0.85rem; color: #4b5563;">${escapeHTML(studentName)}</span></td>
+                    <td><span style="font-size: 0.85rem; color: #4b5563;">${escapeHTML(centreName)}</span></td>
+                    <td>${escapeHTML(item.evidence_type)}</td>
+                    <td>${escapeHTML(item.file_name)}</td>
+                    <td>${linkHtml}</td>
+                    <td>${shortlistHtml}</td>
+                    <td><span class="badge badge-${item.verification_status.toLowerCase()}">${item.verification_status}</span></td>
+                    ${isAdm ? `<td>${actionHtml}</td>` : ''}
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function toggleShortlist(spId, newStatus) {
+            if (!window.supabaseClient) return;
+            try {
+                const { error } = await window.supabaseClient
+                    .from('stage_participants')
+                    .update({ qualification_status: newStatus })
+                    .eq('id', spId);
+                    
+                if (error) throw error;
+                
+                alert(newStatus === 'QUALIFIED' ? 'Participant shortlisted as Finalist!' : 'Shortlist removed.');
+                await loadEvidenceRegistry();
+            } catch (err) {
+                console.error("Error toggling finalist status:", err);
+                alert("Error: " + err.message);
             }
         }
 
@@ -481,6 +697,93 @@
                 console.error("Error updating status:", error);
                 alert("Error modifying status.");
             }
+        }
+
+        function exportEvidenceToCSV() {
+            const eventVal = document.getElementById('filterEventGrid').value;
+            const centreVal = document.getElementById('filterCentreGrid').value;
+            const searchVal = document.getElementById('searchEvidence').value.toLowerCase().trim();
+
+            let list = [...allEvidenceRecords];
+
+            if (eventVal) {
+                list = list.filter(item => item.event_id === eventVal);
+            }
+
+            if (centreVal) {
+                list = list.filter(item => {
+                    const studentCentreId = item.event_participants && item.event_participants.students 
+                        ? item.event_participants.students.centre_id 
+                        : item.centre_id;
+                    return studentCentreId === centreVal;
+                });
+            }
+
+            if (searchVal) {
+                list = list.filter(item => {
+                    const studentName = item.event_participants && item.event_participants.students
+                        ? item.event_participants.students.name.toLowerCase()
+                        : '';
+                    const studentId = item.event_participants && item.event_participants.students
+                        ? item.event_participants.students.student_id.toLowerCase()
+                        : '';
+                    const fileName = item.file_name.toLowerCase();
+                    return studentName.includes(searchVal) || studentId.includes(searchVal) || fileName.includes(searchVal);
+                });
+            }
+
+            if (list.length === 0) {
+                alert("No evidence records to export.");
+                return;
+            }
+
+            // Build CSV Content
+            let csvContent = "\uFEFF"; // UTF-8 BOM
+            csvContent += "Event,Participant Name,Participant ID,Centre,Evidence Type,File Name,Google Drive Link,Verification Status\n";
+
+            list.forEach(item => {
+                const eventName = item.events ? item.events.name : 'Saksharta Challenge';
+                const partName = item.event_participants && item.event_participants.students ? item.event_participants.students.name : 'General';
+                const partId = item.event_participants && item.event_participants.students ? item.event_participants.students.student_id : 'N/A';
+                
+                let centreName = 'General / Admin';
+                const ep = item.event_participants;
+                if (ep && ep.students && ep.students.centres) {
+                    centreName = ep.students.centres.centre_name;
+                } else if (item.centre_id) {
+                    const centreObj = loadedCentres.find(c => c.id === item.centre_id);
+                    centreName = centreObj ? centreObj.centre_name : 'General Centre';
+                }
+
+                const type = item.evidence_type;
+                const fileName = item.file_name;
+                const link = item.storage_path;
+                const status = item.verification_status;
+
+                // Escape commas and quotes
+                const row = [
+                    `"${eventName.replace(/"/g, '""')}"`,
+                    `"${partName.replace(/"/g, '""')}"`,
+                    `"${partId.replace(/"/g, '""')}"`,
+                    `"${centreName.replace(/"/g, '""')}"`,
+                    `"${type.replace(/"/g, '""')}"`,
+                    `"${fileName.replace(/"/g, '""')}"`,
+                    `"${link.replace(/"/g, '""')}"`,
+                    `"${status.replace(/"/g, '""')}"`
+                ].join(",");
+
+                csvContent += row + "\n";
+            });
+
+            // Create download element
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "TeacherDay_Evidence_Export.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function escapeHTML(str) {
