@@ -1103,15 +1103,14 @@
 
                 // Insert Event Centres mapping
                 if (eventConfig.basic.centres && eventConfig.basic.centres.length > 0) {
-                    for (const centreId of eventConfig.basic.centres) {
-                        const { error: ecErr } = await window.supabaseClient
-                            .from('event_centres')
-                            .insert({
-                                event_id: event.id,
-                                centre_id: centreId
-                            });
-                        if (ecErr) throw ecErr;
-                    }
+                    const ecInserts = eventConfig.basic.centres.map(centreId => ({
+                        event_id: event.id,
+                        centre_id: centreId
+                    }));
+                    const { error: ecErr } = await window.supabaseClient
+                        .from('event_centres')
+                        .insert(ecInserts);
+                    if (ecErr) throw ecErr;
                 }
 
                 // Insert Event Features mapping

@@ -521,6 +521,9 @@
             }
 
             try {
+                const scoresToUpsert = [];
+                const localCritDataMap = {}; // Maps stage_participant_id -> criteria data
+
                 // Loop through all loaded participants (even if currently filtered out in the UI)
                 for (const sp of participants) {
                     const spId = sp.id;
@@ -553,61 +556,71 @@
                             throw new Error(`Score limit error: criteria score ${numericVal} exceeds max ${maxVal} for student ${sp.participant_id.student_id.name}.`);
                         }
                         
-                        critData.push({ critId: crit.id, val: numericVal });
+                        critData.push({ criteria_id: crit.id, score: numericVal });
                     }
 
                     if (skipRow) continue; // Skip saving empty drafts for specific rows
 
-                    // 2. Fetch or Create primary score record in assessment_scores
-                    let scoreId;
+                    const scorePayload = {
+                        assessment_id: assessmentId,
+                        stage_participant_id: spId,
+                        judge_id: profile.id,
+                        total_score: totalScore,
+                        remarks: remarks,
+                        status: statusString,
+                        updated_at: new Date().toISOString()
+                    };
 
                     if (rec.score_id) {
-                        // Update
-                        scoreId = rec.score_id;
-                        const { error: updErr } = await window.supabaseClient
-                            .from('assessment_scores')
-                            .update({
-                                total_score: totalScore,
-                                remarks: remarks,
-                                status: statusString,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', scoreId);
-
-                        if (updErr) throw updErr;
-                    } else {
-                        // Insert
-                        const { data: newScore, error: insErr } = await window.supabaseClient
-                            .from('assessment_scores')
-                            .insert({
-                                assessment_id: assessmentId,
-                                stage_participant_id: spId,
-                                judge_id: profile.id,
-                                total_score: totalScore,
-                                remarks: remarks,
-                                status: statusString
-                            })
-                            .select()
-                            .single();
-
-                        if (insErr) throw insErr;
-                        scoreId = newScore.id;
-                        rec.score_id = scoreId; // cache it locally
+                        scorePayload.id = rec.score_id;
                     }
 
-                    // 3. Upsert criteria subscores
-                    for (const cd of critData) {
-                        const { error: crErr } = await window.supabaseClient
+                    scoresToUpsert.push(scorePayload);
+                    localCritDataMap[spId] = critData;
+                }
+
+                if (scoresToUpsert.length > 0) {
+                    // Batch Upsert 1: assessment_scores
+                    const { data: upsertedScores, error: scoreErr } = await window.supabaseClient
+                        .from('assessment_scores')
+                        .upsert(scoresToUpsert, {
+                            onConflict: 'assessment_id,stage_participant_id,judge_id'
+                        })
+                        .select('id, stage_participant_id');
+
+                    if (scoreErr) throw scoreErr;
+
+                    // Build batch criteria_scores payload
+                    const criteriaScoresToUpsert = [];
+                    for (const scoreRow of upsertedScores) {
+                        const spId = scoreRow.stage_participant_id;
+                        const scoreId = scoreRow.id;
+                        const critData = localCritDataMap[spId];
+
+                        // Cache it back locally
+                        if (scoreRecords[spId]) {
+                            scoreRecords[spId].score_id = scoreId;
+                        }
+
+                        if (critData) {
+                            critData.forEach(cd => {
+                                criteriaScoresToUpsert.push({
+                                    score_id: scoreId,
+                                    criteria_id: cd.criteria_id,
+                                    score: cd.score
+                                });
+                            });
+                        }
+                    }
+
+                    // Batch Upsert 2: criteria_scores
+                    if (criteriaScoresToUpsert.length > 0) {
+                        const { error: critErr } = await window.supabaseClient
                             .from('criteria_scores')
-                            .upsert({
-                                score_id: scoreId,
-                                criteria_id: cd.critId,
-                                score: cd.val
-                            }, {
+                            .upsert(criteriaScoresToUpsert, {
                                 onConflict: 'score_id,criteria_id'
                             });
-
-                        if (crErr) throw crErr;
+                        if (critErr) throw critErr;
                     }
                 }
 
