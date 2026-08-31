@@ -75,7 +75,7 @@
                         </div>
                     </div>
                     
-                    <div id="rulesControlBlock" style="display: flex; gap: 12px;" data-allowed-roles="super_admin, prog_admin, project_director, ceo">
+                    <div id="rulesControlBlock" style="display: flex; gap: 12px;" data-allowed-roles="super_admin, prog_admin, judge, final_judge, project_director, ceo">
                         <button class="btn btn-secondary" onclick="executeAdvancementRules()">Calculate Rank & Qualify</button>
                         <button class="btn btn-primary" id="confirmFinalistsBtn" onclick="confirmAndPromoteFinalists()">Confirm & Promote to Next Stage</button>
                     </div>
@@ -136,6 +136,7 @@
             document.getElementById('centreFilter').addEventListener('change', renderLeaderboard);
 
             await fetchConfigurationMetadata();
+            window.Permissions.applyUIRules();
         });
 
         async function fetchConfigurationMetadata() {
@@ -333,6 +334,14 @@
         }
 
         function renderLeaderboard() {
+            const userRole = window.Auth.getUserProfile()?.role;
+            const isPDOrAdmin = ['super_admin', 'prog_admin', 'judge', 'final_judge', 'project_director', 'ceo'].includes(userRole) || isUserEventLead;
+
+            const confirmBtn = document.getElementById('confirmFinalistsBtn');
+            if (confirmBtn) {
+                confirmBtn.style.display = isPDOrAdmin ? 'inline-block' : 'none';
+            }
+
             const selectedCentre = document.getElementById('centreFilter').value;
             const tbody = document.querySelector('#resultsTable tbody');
             tbody.innerHTML = '';
@@ -380,7 +389,8 @@
                 // Display Total and Badge Status
                 const badgeClass = sp.qualification_status.toLowerCase();
 
-                const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'project_director', 'ceo']) || isUserEventLead;
+                const userRole = window.Auth.getUserProfile()?.role;
+                const isPDOrAdmin = ['super_admin', 'prog_admin', 'judge', 'final_judge', 'project_director', 'ceo'].includes(userRole) || isUserEventLead;
                 let actionsHtml = '';
                 if (isPDOrAdmin) {
                     if (sp.qualification_status === 'PENDING' || sp.qualification_status === 'DISQUALIFIED') {

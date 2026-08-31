@@ -185,6 +185,13 @@
                         </div>
                     </div>
 
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label class="form-label" style="font-weight: bold;">Assign Event Leads (Program Admins)</label>
+                        <div id="eventLeadsCheckboxGroup" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); background-color: var(--bg-base);">
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Loading program admins...</span>
+                        </div>
+                    </div>
+
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
                         <button class="btn btn-secondary" onclick="window.location.href='events.html'">Cancel</button>
                         <button class="btn btn-primary" onclick="goToStep(2)">Next: Phases</button>
@@ -318,7 +325,8 @@
             assessments: {},
             criteria: {},
             advancement: {},
-            features: []
+            features: [],
+            leads: []
         };
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -331,6 +339,7 @@
 
             await loadCentresCheckboxes();
             await loadFeaturesCheckboxes();
+            await loadEventLeadsCheckboxes();
 
             // Custom multi-select dropdown toggle
             const classSelectDropdown = document.getElementById('classSelectDropdown');
@@ -441,6 +450,24 @@
                 const featureCbs = document.querySelectorAll('.feature-cb');
                 featureCbs.forEach(cb => {
                     cb.checked = enabledFeatureCodes.includes(cb.value);
+                });
+
+                // Fetch event leads mapping
+                let selectedLeads = [];
+                try {
+                    const { data: evLeads, error: elErr } = await window.supabaseClient
+                        .from('event_leads')
+                        .select('user_id')
+                        .eq('event_id', eventId);
+                    if (elErr) throw elErr;
+                    selectedLeads = evLeads ? evLeads.map(el => el.user_id) : [];
+                } catch (err) {
+                    console.log("event_leads table does not exist or query failed:", err.message);
+                }
+
+                const leadCbs = document.querySelectorAll('.lead-cb');
+                leadCbs.forEach(cb => {
+                    cb.checked = selectedLeads.includes(cb.value);
                 });
 
                 // 3. Fetch stages (Phases)
@@ -630,6 +657,46 @@
             }
         }
 
+        async function loadEventLeadsCheckboxes() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: users, error } = await window.supabaseClient
+                    .from('users')
+                    .select('id, name, email, user_roles!inner(role_id)')
+                    .in('user_roles.role_id', ['prog_admin', 'super_admin'])
+                    .eq('status', 'active')
+                    .order('name');
+
+                if (error) throw error;
+
+                const group = document.getElementById('eventLeadsCheckboxGroup');
+                group.innerHTML = '';
+
+                if (!users || users.length === 0) {
+                    group.innerHTML = `<span style="color: var(--text-muted); font-size: 0.9rem;">No active Program Admins found.</span>`;
+                    return;
+                }
+
+                users.forEach(u => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '6px';
+                    label.style.fontSize = '0.9rem';
+                    label.style.fontWeight = '500';
+                    label.style.cursor = 'pointer';
+                    label.title = u.email;
+                    label.innerHTML = `
+                        <input type="checkbox" class="lead-cb" value="${u.id}">
+                        <span>${escapeHTML(u.name)}</span>
+                    `;
+                    group.appendChild(label);
+                });
+            } catch (err) {
+                console.error("Error loading event leads checkboxes:", err);
+            }
+        }
+
         function addStageItem() {
             const container = document.getElementById('stagesList');
             const seq = container.children.length + 1;
@@ -687,7 +754,8 @@
                     regEnd: document.getElementById('regEnd').value,
                     objective: document.getElementById('objective').value.trim(),
                     centres: Array.from(document.querySelectorAll('.centre-cb:checked')).map(el => el.value),
-                    features: Array.from(document.querySelectorAll('.feature-cb:checked')).map(el => el.value)
+                    features: Array.from(document.querySelectorAll('.feature-cb:checked')).map(el => el.value),
+                    leads: Array.from(document.querySelectorAll('.lead-cb:checked')).map(el => el.value)
                 };
             } else if (step === 2) {
                 const stageElements = document.querySelectorAll('#stagesList .stage-item');
@@ -951,6 +1019,10 @@
                 });
             } else if (step === 6) {
                 // Build Review Content
+                const checkedLeadNames = Array.from(document.querySelectorAll('.lead-cb:checked'))
+                    .map(cb => cb.nextElementSibling.textContent)
+                    .join(', ');
+
                 const container = document.getElementById('reviewContent');
                 container.innerHTML = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -961,6 +1033,7 @@
                             <p><strong>Academic Year:</strong> ${eventConfig.basic.year}</p>
                             <p><strong>Timeline:</strong> ${eventConfig.basic.startDate} to ${eventConfig.basic.endDate}</p>
                             <p><strong>Active Features:</strong> ${eventConfig.basic.features && eventConfig.basic.features.length > 0 ? eventConfig.basic.features.join(', ') : 'None'}</p>
+                            <p><strong>Event Leads:</strong> ${checkedLeadNames || 'None assigned'}</p>
                         </div>
                         <div>
                             <h4 style="font-size: 1rem; margin-bottom: 8px;">Phases Map</h4>
@@ -1078,6 +1151,9 @@
 
                     const { error: delEf } = await window.supabaseClient.from('event_features_mapping').delete().eq('event_id', editEventId);
                     if (delEf) throw delEf;
+
+                    const { error: delEl } = await window.supabaseClient.from('event_leads').delete().eq('event_id', editEventId);
+                    if (delEl) throw delEl;
                 } else {
                     // Insert Root Event
                     const { data: evData, error: evErr } = await window.supabaseClient
@@ -1124,6 +1200,18 @@
                         .from('event_features_mapping')
                         .insert(efInserts);
                     if (efErr) throw efErr;
+                }
+
+                // Insert Event Leads mapping
+                if (eventConfig.basic.leads && eventConfig.basic.leads.length > 0) {
+                    const elInserts = eventConfig.basic.leads.map(userId => ({
+                        event_id: event.id,
+                        user_id: userId
+                    }));
+                    const { error: elErr } = await window.supabaseClient
+                        .from('event_leads')
+                        .insert(elInserts);
+                    if (elErr) throw elErr;
                 }
 
                 // Insert Stages
