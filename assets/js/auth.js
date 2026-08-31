@@ -77,9 +77,45 @@ const Auth = {
         return profile.roles.some(r => roles.includes(r));
     },
 
+    // Refresh User Profile from DB
+    async refreshProfile() {
+        const cached = this.getUserProfile();
+        if (!cached || !cached.id || !window.supabaseClient) return cached;
+        try {
+            const { data: user } = await window.supabaseClient
+                .from('users')
+                .select('*')
+                .eq('id', cached.id)
+                .single();
+            if (user) {
+                const { data: roles } = await window.supabaseClient
+                    .from('user_roles')
+                    .select('role_id')
+                    .eq('user_id', user.id);
+                user.roles = roles ? roles.map(r => r.role_id) : (cached.roles || ['management']);
+                if (user.centre_id) {
+                    const { data: centre } = await window.supabaseClient
+                        .from('centres')
+                        .select('centre_name, centre_code')
+                        .eq('id', user.centre_id)
+                        .single();
+                    user.centres = centre;
+                } else {
+                    user.centres = null;
+                }
+                localStorage.setItem('user_session', JSON.stringify(user));
+                localStorage.setItem('user_profile', JSON.stringify(user));
+                return user;
+            }
+        } catch (e) {
+            console.warn("Could not refresh profile:", e);
+        }
+        return cached;
+    },
+
     // Secure Routes
     async checkSessionRedirect(allowedRoles = []) {
-        const profile = this.getUserProfile();
+        let profile = this.getUserProfile();
         
         if (!profile) {
             localStorage.removeItem('user_session');
@@ -90,6 +126,9 @@ const Auth = {
             }
             return false;
         }
+
+        // Keep profile in sync with DB
+        profile = await this.refreshProfile();
 
         // If specific roles required, assert matching permissions
         if (allowedRoles.length > 0) {

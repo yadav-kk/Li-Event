@@ -193,10 +193,6 @@
                         .eq('assessment_id', assessmentId);
                     allowedCentreIds = assignData ? assignData.map(a => a.centre_id).filter(id => id) : [];
                     isAssigned = assignData && assignData.length > 0;
-
-                    if (allowedCentreIds.length === 0 && profile.centre_id) {
-                        allowedCentreIds = [profile.centre_id];
-                    }
                 }
 
                 // Check if allow_centre_marking feature is enabled for this event
