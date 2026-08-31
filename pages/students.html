@@ -87,6 +87,7 @@
                                         <th>Gender</th>
                                         <th>Centre</th>
                                         <th>Program</th>
+                                        <th>Validation Status</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -766,7 +767,7 @@
                 return;
             }
 
-            // Headers: Participant Name, Gender, Class, Centre Code, Program Code, Guardian Name, Guardian Mobile, Language
+            // Headers: Name, Gender, Centre Code, Program Code, Guardian Name, Guardian Mobile, Language
             const headers = rows[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
             
             importedParsedRows = [];
@@ -789,8 +790,41 @@
                 const lang = cols[6] || 'Hindi';
                 const targetClass = 'N/A';
 
-                // Simple validation check
-                const isValid = name && gender && centreCode && programCode;
+                const rowErrors = [];
+
+                // 1. Validate Name
+                if (!name) {
+                    rowErrors.push("Missing Name");
+                }
+
+                // 2. Validate Gender
+                if (!gender) {
+                    rowErrors.push("Missing Gender");
+                } else if (!['M', 'F', 'Other'].includes(gender)) {
+                    rowErrors.push(`Invalid Gender "${gender}" (use M, F, or Other)`);
+                }
+
+                // 3. Validate Centre Code
+                if (!centreCode) {
+                    rowErrors.push("Missing Centre Code");
+                } else {
+                    const matchingCentre = centres.find(c => c.centre_code === centreCode);
+                    if (!matchingCentre) {
+                        rowErrors.push(`Invalid Centre Code "${centreCode}"`);
+                    }
+                }
+
+                // 4. Validate Program Code
+                if (programCode && programCode !== 'N/A') {
+                    const matchingProgram = programs.find(p => p.program_code === programCode);
+                    if (!matchingProgram) {
+                        rowErrors.push(`Invalid Program Code "${programCode}"`);
+                    }
+                }
+
+                const isValid = rowErrors.length === 0;
+                
+                const tr = document.createElement('tr');
                 
                 if (isValid) {
                     validCount++;
@@ -798,25 +832,49 @@
                         name, gender, targetClass, centreCode, programCode, guardName, guardMobile, lang
                     });
 
-                    // Add to preview table
-                    const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td>${name}</td>
-                        <td>${gender}</td>
-                        <td>${centreCode}</td>
-                        <td>${programCode}</td>
+                        <td>${escapeHTML(name)}</td>
+                        <td>${escapeHTML(gender)}</td>
+                        <td>${escapeHTML(centreCode)}</td>
+                        <td>${escapeHTML(programCode || 'N/A')}</td>
+                        <td style="color: var(--success); font-weight: bold;">✅ OK</td>
                     `;
-                    previewTbody.appendChild(tr);
                 } else {
                     invalidCount++;
+                    tr.style.backgroundColor = '#fef2f2';
+                    tr.style.color = '#b91c1c';
+                    tr.innerHTML = `
+                        <td><strong>${escapeHTML(name || '[Empty]')}</strong></td>
+                        <td>${escapeHTML(gender || '[Empty]')}</td>
+                        <td>${escapeHTML(centreCode || '[Empty]')}</td>
+                        <td>${escapeHTML(programCode || 'N/A')}</td>
+                        <td style="font-weight: bold; font-size: 0.8rem;">❌ ${rowErrors.join(', ')}</td>
+                    `;
                 }
+                previewTbody.appendChild(tr);
             }
 
-            document.getElementById('previewCounts').textContent = `Total Rows: ${rows.length - 1} | Valid: ${validCount} | Invalid: ${invalidCount}`;
+            // Display preview counts summary
+            let countsHtml = `Total Rows: ${rows.length - 1} | `;
+            countsHtml += `<span style="color: var(--success); font-weight: bold;">Valid: ${validCount}</span> | `;
+            countsHtml += `<span style="color: var(--danger); font-weight: bold;">Invalid: ${invalidCount}</span>`;
+            
+            if (invalidCount > 0) {
+                countsHtml += `<br><small style="color: var(--danger); font-weight: bold; display: block; margin-top: 4px;">⚠️ Warning: ${invalidCount} invalid row(s) detected. Only valid rows will be imported.</small>`;
+            }
+            
+            document.getElementById('previewCounts').innerHTML = countsHtml;
             document.getElementById('importPreview').style.display = 'block';
 
             const confirmBtn = document.getElementById('confirmImportBtn');
             confirmBtn.disabled = validCount === 0;
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
         }
 
         async function executeBulkImport() {
