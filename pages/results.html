@@ -57,6 +57,12 @@
                 <!-- Action bar for running rules -->
                 <div class="card" style="margin-bottom: 24px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
                     <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; min-width: 220px;">
+                            <label class="form-label" style="font-size: 0.75rem;">Select Event</label>
+                            <select class="form-control" id="eventSelect" style="padding: 8px 12px;">
+                                <option value="">Select Event...</option>
+                            </select>
+                        </div>
                         <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
                             <label class="form-label" style="font-size: 0.75rem;">Selected Event Stage</label>
                             <select class="form-control" id="stageSelect" style="padding: 8px 12px;"></select>
@@ -125,6 +131,7 @@
                 window.Auth.signOut();
             });
 
+            document.getElementById('eventSelect').addEventListener('change', handleEventChange);
             document.getElementById('stageSelect').addEventListener('change', handleStageChange);
             document.getElementById('centreFilter').addEventListener('change', renderLeaderboard);
 
@@ -147,30 +154,71 @@
                     filter.appendChild(opt);
                 });
 
-                // Fetch Stages mapped to default active event
+                // Fetch Events dropdown filter
+                const { data: events, error: evErr } = await window.supabaseClient
+                    .from('events')
+                    .select('*')
+                    .not('status', 'in', '("DRAFT","CANCELLED")')
+                    .order('name', { ascending: true });
+
+                if (evErr) throw evErr;
+
+                const eventSelect = document.getElementById('eventSelect');
+                eventSelect.innerHTML = '<option value="">-- Select Event --</option>';
+                
+                events.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.id;
+                    opt.textContent = `${e.name} (${e.event_code})`;
+                    eventSelect.appendChild(opt);
+                });
+
+                if (events.length > 0) {
+                    // Default to first active assessment event or first event
+                    const defaultEvent = events.find(e => e.status === 'ASSESSMENT') || events[0];
+                    eventSelect.value = defaultEvent.id;
+                    await handleEventChange();
+                }
+
+            } catch (err) {
+                console.error("Error loading config metadata:", err);
+            }
+        }
+
+        async function handleEventChange() {
+            const eventId = document.getElementById('eventSelect').value;
+            const stageSelect = document.getElementById('stageSelect');
+            stageSelect.innerHTML = '<option value="">-- Select Stage --</option>';
+            
+            // Clear current table results
+            const tbody = document.querySelector('#resultsTable tbody');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Select a stage to view rankings.</td></tr>';
+
+            if (!eventId) return;
+
+            try {
+                // Fetch stages for chosen event
                 const { data: stages, error: stErr } = await window.supabaseClient
                     .from('event_stages')
-                    .select('*, event_id!inner(name)')
-                    .eq('event_id.event_code', 'GT-LIT-2026')
+                    .select('*')
+                    .eq('event_id', eventId)
                     .order('sequence', { ascending: true });
 
                 if (stErr) throw stErr;
 
-                const stageSelect = document.getElementById('stageSelect');
                 stages.forEach(st => {
                     const opt = document.createElement('option');
                     opt.value = st.id;
-                    opt.textContent = `${st.name} (${st.event_id.name})`;
+                    opt.textContent = st.name;
                     stageSelect.appendChild(opt);
                 });
 
                 if (stages.length > 0) {
                     stageSelect.value = stages[0].id;
-                    handleStageChange();
+                    await handleStageChange();
                 }
-
             } catch (err) {
-                console.error("Error loading config metadata:", err);
+                console.error("Error loading stages for event:", err);
             }
         }
 
@@ -333,9 +381,21 @@
                 const badgeClass = sp.qualification_status.toLowerCase();
 
                 const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'project_director', 'ceo']) || isUserEventLead;
-                let actionsHtml = '—';
-                if (isPDOrAdmin && sp.qualification_status !== 'DISQUALIFIED') {
-                    actionsHtml = `<button class="btn btn-danger btn-sm" onclick="disqualifyParticipant('${sp.id}', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Drop</button>`;
+                let actionsHtml = '';
+                if (isPDOrAdmin) {
+                    if (sp.qualification_status === 'PENDING' || sp.qualification_status === 'DISQUALIFIED') {
+                        actionsHtml += `<button class="btn btn-success btn-sm" onclick="setQualificationStatus('${sp.id}', 'QUALIFIED', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px; background-color: var(--success); border-color: var(--success); color: white;">Promote</button>`;
+                    } else if (sp.qualification_status === 'QUALIFIED') {
+                        actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="setQualificationStatus('${sp.id}', 'PENDING', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">Demote</button>`;
+                    } else if (sp.qualification_status === 'CONFIRMED') {
+                        actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="setQualificationStatus('${sp.id}', 'PENDING', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;" title="Unlock selection">Unlock</button>`;
+                    }
+                    if (sp.qualification_status !== 'DISQUALIFIED') {
+                        actionsHtml += `<button class="btn btn-danger btn-sm" onclick="setQualificationStatus('${sp.id}', 'DISQUALIFIED', '${sInfo.name.replace(/'/g, "\\'")}')" style="padding: 4px 8px; font-size: 0.75rem;">Drop</button>`;
+                    }
+                }
+                if (!actionsHtml) {
+                    actionsHtml = '—';
                 }
 
                 html += `
@@ -349,23 +409,27 @@
             });
         }
 
-        async function disqualifyParticipant(spId, name) {
-            if (!confirm(`Are you sure you want to drop/disqualify participant "${name}" from this phase?`)) {
-                return;
-            }
+        async function setQualificationStatus(spId, newStatus, name) {
+            const confirmMsg = newStatus === 'QUALIFIED' 
+                ? `Are you sure you want to promote/qualify participant "${name}" directly to the next stage?`
+                : newStatus === 'DISQUALIFIED'
+                ? `Are you sure you want to drop/disqualify participant "${name}" from this phase?`
+                : `Are you sure you want to revert participant "${name}" status to PENDING?`;
+
+            if (!confirm(confirmMsg)) return;
 
             try {
                 const { error } = await window.supabaseClient
                     .from('stage_participants')
-                    .update({ qualification_status: 'DISQUALIFIED' })
+                    .update({ qualification_status: newStatus })
                     .eq('id', spId);
 
                 if (error) throw error;
 
-                alert('Participant has been disqualified from this phase.');
+                alert(`Participant status updated to ${newStatus}.`);
                 await fetchStageRankings();
             } catch (err) {
-                console.error("Error disqualifying participant:", err);
+                console.error("Error setting qualification status:", err);
                 alert("Error: " + err.message);
             }
         }
@@ -454,6 +518,17 @@
                             });
                     }
                 }
+
+                // 4. Update the next stage's status to SCHEDULED and its assessments to ACTIVE
+                await window.supabaseClient
+                    .from('event_stages')
+                    .update({ status: 'SCHEDULED' })
+                    .eq('id', nextStage.id);
+
+                await window.supabaseClient
+                    .from('event_assessments')
+                    .update({ status: 'ACTIVE' })
+                    .eq('stage_id', nextStage.id);
 
                 alert(`Finalists confirmed and promoted to: ${nextStage.name}!`);
                 await fetchStageRankings();

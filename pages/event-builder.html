@@ -1071,7 +1071,7 @@
                                 name: ass.name,
                                 sequence: ass.sequence,
                                 max_marks: ass.max_marks,
-                                status: 'DRAFT',
+                                status: stage.status === 'SCHEDULED' ? 'ACTIVE' : 'DRAFT',
                                 start_datetime: stage.start_datetime,
                                 end_datetime: stage.end_datetime
                             })

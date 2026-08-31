@@ -177,6 +177,7 @@
                                     <th>Centre</th>
                                     <th>Type</th>
                                     <th>File Name</th>
+                                    <th>Date of Upload</th>
                                     <th>View Document</th>
                                     <th>Shortlist Status</th>
                                     <th>Verification Status</th>
@@ -521,6 +522,7 @@
                     <td><span style="font-size: 0.85rem; color: #4b5563;">${escapeHTML(centreName)}</span></td>
                     <td>${escapeHTML(item.evidence_type)}</td>
                     <td>${escapeHTML(item.file_name)}</td>
+                    <td><span style="font-size: 0.85rem; color: #4b5563; white-space: nowrap;">${formatUploadDate(item.created_at)}</span></td>
                     <td>${linkHtml}</td>
                     <td>${shortlistHtml}</td>
                     <td><span class="badge badge-${item.verification_status.toLowerCase()}">${item.verification_status}</span></td>
@@ -846,6 +848,18 @@
             return str.replace(/[&<>'"]/g, 
                 tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
             );
+        }
+
+        function formatUploadDate(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '—';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yy = String(d.getFullYear()).slice(-2);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mins = String(d.getMinutes()).padStart(2, '0');
+            return `${dd}-${mm}-${yy}-${hh}:${mins}`;
         }
     </script>
 </body>

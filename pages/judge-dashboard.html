@@ -133,12 +133,8 @@
                     .from('event_assessments')
                     .select('*, stage_id!inner(name, status, event_id!inner(name, status))')
                     .eq('status', 'ACTIVE')
+                    .in('stage_id.event_id.status', ['PRACTICE', 'ASSESSMENT', 'IN_PROGRESS'])
                     .order('sequence', { ascending: true });
-
-                const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'final_judge', 'project_director', 'ceo']);
-                if (!isSuper) {
-                    query = query.eq('stage_id.event_id.status', 'ASSESSMENT');
-                }
 
                 const { data: assessments, error: asErr } = await query;
                 if (asErr) throw asErr;
@@ -237,7 +233,8 @@
 
                         const assessInfo = `
                             <strong>${a.name}</strong><br>
-                            <small style="color: var(--text-secondary);">${a.max_marks} Max Marks</small>
+                            <small style="color: var(--text-secondary);">${a.max_marks} Max Marks</small><br>
+                            <span class="badge badge-${a.status === 'ACTIVE' ? 'completed' : 'draft'}" style="margin-top: 4px;">${a.status}</span>
                         `;
 
                         const criteria = a.assessment_criteria || [];
@@ -266,7 +263,16 @@
                             judgesHtml = '<span style="color: var(--text-muted); font-size: 0.85rem;">No judges assigned</span>';
                         }
 
-                        const actionHtml = `<a href="score-entry.html?assessment_id=${a.id}" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.8rem;">Override/View Scores</a>`;
+                        const toggleStatusBtn = a.status === 'ACTIVE'
+                            ? `<button class="btn btn-warning btn-sm" onclick="toggleAssessmentStatus('${a.id}', 'DRAFT')" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 4px;">Set Draft</button>`
+                            : `<button class="btn btn-success btn-sm" onclick="toggleAssessmentStatus('${a.id}', 'ACTIVE')" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 4px;">Activate</button>`;
+
+                        const actionHtml = `
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
+                                ${toggleStatusBtn}
+                                <a href="score-entry.html?assessment_id=${a.id}" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.8rem;">Scores</a>
+                            </div>
+                        `;
 
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
@@ -284,6 +290,32 @@
             } catch (err) {
                 console.error("Error loading admin assessments:", err);
                 document.querySelector('#adminAssessTable tbody').innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--danger);">Failed to load admin assessments.</td></tr>';
+            }
+        }
+
+        async function toggleAssessmentStatus(assessmentId, newStatus) {
+            if (!window.supabaseClient) return;
+
+            const confirmMsg = newStatus === 'ACTIVE' 
+                ? "Are you sure you want to ACTIVATE this assessment? Judges will be able to see it and submit scores."
+                : "Are you sure you want to set this assessment to DRAFT? Judges will no longer be able to see it.";
+
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const { error } = await window.supabaseClient
+                    .from('event_assessments')
+                    .update({ status: newStatus })
+                    .eq('id', assessmentId);
+
+                if (error) throw error;
+
+                alert(`Assessment status updated to ${newStatus}!`);
+                await fetchJudgeAssessments();
+                await fetchAdminAssessments();
+            } catch (err) {
+                console.error("Failed to toggle assessment status:", err);
+                alert("Failed to update status: " + err.message);
             }
         }
     </script>
