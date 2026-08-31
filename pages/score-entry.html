@@ -14,6 +14,7 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+    <script src="../assets/js/layout.js"></script>
 </head>
 <body>
 
@@ -158,8 +159,8 @@
 
                 // Check permissions and direct centre marking features
                 const profile = window.Auth.getUserProfile();
-                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo', 'final_judge']);
-                const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
+                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin']);
+                const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator', 'ceo', 'management']);
                 const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
 
                 // Query if user is an event lead

@@ -14,6 +14,7 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+    <script src="../assets/js/layout.js"></script>
 </head>
 <body>
 
@@ -300,12 +301,58 @@
             if (!window.supabaseClient) return;
 
             try {
+                const profile = window.Auth.getUserProfile();
+                const isSuperAdmin = profile?.role === 'super_admin';
+                const isProgAdmin = profile?.role === 'prog_admin';
+                const isPD = profile?.role === 'project_director';
+
+                // Check active events query
+                let eventsQuery = window.supabaseClient.from('events').select('*');
+                if (isPD) {
+                    eventsQuery = eventsQuery.not('status', 'in', '("COMPLETED","ARCHIVED","CANCELLED")');
+                }
+
+                let centresQuery = window.supabaseClient.from('centres').select('*', { count: 'exact', head: true });
+                let studentsQuery = window.supabaseClient.from('students').select('*', { count: 'exact', head: true });
+                let scoresQuery = window.supabaseClient.from('assessment_scores').select('*', { count: 'exact', head: true }).in('status', ['VERIFIED', 'LOCKED']);
+
+                // Filter statistics dynamically for local roles (PD, coordinator, centre_incharge)
+                if (!isSuperAdmin && !isProgAdmin) {
+                    let userCentreIds = [];
+                    if (profile?.centre_id) {
+                        userCentreIds.push(profile.centre_id);
+                    }
+
+                    // Fetch user_centres mapping
+                    const { data: ucData } = await window.supabaseClient
+                        .from('user_centres')
+                        .select('centre_id')
+                        .eq('user_id', profile.id);
+                    if (ucData) {
+                        ucData.forEach(uc => {
+                            if (!userCentreIds.includes(uc.centre_id)) {
+                                userCentreIds.push(uc.centre_id);
+                            }
+                        });
+                    }
+
+                    if (userCentreIds.length > 0) {
+                        centresQuery = window.supabaseClient.from('centres').select('*', { count: 'exact', head: true }).in('id', userCentreIds);
+                        studentsQuery = window.supabaseClient.from('students').select('*', { count: 'exact', head: true }).in('centre_id', userCentreIds);
+                        scoresQuery = window.supabaseClient
+                            .from('assessment_scores')
+                            .select('id, stage_participant_id!inner(participant_id!inner(student_id!inner(centre_id)))', { count: 'exact', head: true })
+                            .in('stage_participant_id.participant_id.student_id.centre_id', userCentreIds)
+                            .in('status', ['VERIFIED', 'LOCKED']);
+                    }
+                }
+
                 // Fetch stats and lists concurrently to speed up dashboard load
                 const [eventsRes, centresRes, studentsRes, scoresRes] = await Promise.all([
-                    window.supabaseClient.from('events').select('*').order('created_at', { ascending: false }),
-                    window.supabaseClient.from('centres').select('*', { count: 'exact', head: true }),
-                    window.supabaseClient.from('students').select('*', { count: 'exact', head: true }),
-                    window.supabaseClient.from('assessment_scores').select('*', { count: 'exact', head: true }).in('status', ['VERIFIED', 'LOCKED'])
+                    eventsQuery.order('created_at', { ascending: false }),
+                    centresQuery,
+                    studentsQuery,
+                    scoresQuery
                 ]);
 
                 if (eventsRes.error) throw eventsRes.error;

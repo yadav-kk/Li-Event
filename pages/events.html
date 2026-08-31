@@ -14,6 +14,7 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+    <script src="../assets/js/layout.js"></script>
 </head>
 <body>
 
@@ -141,6 +142,7 @@
                 const profile = window.Auth.getUserProfile();
                 const isSuperAdmin = profile?.role === 'super_admin';
                 const isProgAdmin = profile?.role === 'prog_admin';
+                const isPD = profile?.role === 'project_director';
 
                 let query = window.supabaseClient.from('events').select('*');
 
@@ -154,6 +156,10 @@
                     if (leadErr) console.warn("Could not fetch event leads mappings:", leadErr.message);
                     const eventIds = leads ? leads.map(l => l.event_id) : [];
                     query = query.in('id', eventIds);
+                }
+
+                if (isPD) {
+                    query = query.not('status', 'in', '("COMPLETED","ARCHIVED","CANCELLED")');
                 }
 
                 const { data: events, error: err } = await query.order('created_at', { ascending: false });

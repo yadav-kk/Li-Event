@@ -14,6 +14,7 @@
     <script src="../assets/js/supabase.js"></script>
     <script src="../assets/js/auth.js"></script>
     <script src="../assets/js/permissions.js"></script>
+    <script src="../assets/js/layout.js"></script>
 </head>
 <body>
 
@@ -141,7 +142,7 @@
                 const userCentreId = profile ? profile.centre_id : null;
                 const userEmail = profile ? profile.email : null;
                 const userId = profile ? profile.id : null;
-                const isSuper = ['super_admin', 'prog_admin', 'project_director', 'ceo'].includes(userRole) || userEmail === 'judge@test.com';
+                const isSuper = ['super_admin', 'prog_admin'].includes(userRole);
 
                 let query = window.supabaseClient
                     .from('event_assessments')
@@ -164,7 +165,7 @@
                         )
                     `)
                     .eq('status', 'ACTIVE')
-                    .in('stage_id.event_id.status', ['PRACTICE', 'ASSESSMENT', 'IN_PROGRESS'])
+                    .not('stage_id.event_id.status', 'in', '("COMPLETED","ARCHIVED","CANCELLED")')
                     .order('sequence', { ascending: true });
 
                 const { data: assessments, error: asErr } = await query;
@@ -304,7 +305,12 @@
                     .from('event_assessments')
                     .select(`
                         *,
-                        stage_id (name, start_datetime, end_datetime, event_id (name, status)),
+                        stage_id!inner (
+                            name, 
+                            start_datetime, 
+                            end_datetime, 
+                            event_id!inner (name, status)
+                        ),
                         assessment_criteria (name, max_marks),
                         assessment_assignments (
                             centre_id,
@@ -313,6 +319,7 @@
                             users (name, email)
                         )
                     `)
+                    .not('stage_id.event_id.status', 'in', '("COMPLETED","ARCHIVED","CANCELLED")')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
