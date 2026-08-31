@@ -290,7 +290,9 @@
                     } else if (profile.centre_id) {
                         query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
                     }
-                              const { data: spList, error: spErr } = await query;
+                }
+
+                const { data: spList, error: spErr } = await query;
                 if (spErr) throw spErr;
                 participants = spList;
 
