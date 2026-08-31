@@ -1061,6 +1061,29 @@
 
                     if (stErr) throw stErr;
 
+                    // Sync existing event participants if this is Stage 1 (sequence = 1)
+                    if (st.sequence === 1) {
+                        const { data: eps } = await window.supabaseClient
+                            .from('event_participants')
+                            .select('id')
+                            .eq('event_id', event.id);
+
+                        if (eps && eps.length > 0) {
+                            const spInserts = eps.map(ep => ({
+                                stage_id: stage.id,
+                                participant_id: ep.id,
+                                qualification_status: 'PENDING',
+                                attendance: 'PRESENT'
+                            }));
+
+                            const { error: spErr } = await window.supabaseClient
+                                .from('stage_participants')
+                                .insert(spInserts);
+
+                            if (spErr) throw spErr;
+                        }
+                    }
+
                     // Insert Assessments for this stage
                     const assessments = eventConfig.assessments[st.sequence] || [];
                     for (const ass of assessments) {
