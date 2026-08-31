@@ -249,7 +249,7 @@
                 }
 
                 if (isOutsideDateWindow) {
-                    const isAdmin = isSuperEventScope;
+                    const isAdmin = isSuperEventScope || window.Auth.hasRole(['project_director', 'ceo']);
 
                     if (isAdmin) {
                         // Display admin override warning banner
@@ -317,13 +317,13 @@
                     .eq('stage_id', assess.stage_id.id);
 
                 if (!isSuperEventScope) {
-                    if (isPDOrCoord || (isJudge && allowedCentreIds.length > 0)) {
+                    if (isPDOrCoord) {
                         if (allowedCentreIds.length > 0) {
                             query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
-                        } else {
-                            // Return empty if no centres mapped
-                            query = query.eq('participant_id.student_id.centre_id', '00000000-0000-0000-0000-000000000000');
                         }
+                        // If no centres are allotted, do not filter by centre (allowing PD/coordinators to see all participants)
+                    } else if (isJudge && allowedCentreIds.length > 0) {
+                        query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
                     } else if (hasDirectCentreAccess && profile.centre_id) {
                         query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
                     } else {
