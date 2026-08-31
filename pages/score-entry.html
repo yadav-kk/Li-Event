@@ -175,7 +175,7 @@
                 }
 
                 // Super Event Scope = Admins, CEO, Main Judge, or designated Event Leads
-                isSuperEventScope = isSuperRole || (profile && profile.email === 'judge@test.com') || isEventLead;
+                isSuperEventScope = isSuperRole || isEventLead;
 
                 let allowedCentreIds = [];
                 let isAssigned = false;
@@ -249,7 +249,7 @@
                 }
 
                 if (isOutsideDateWindow) {
-                    const isAdmin = isSuperEventScope || window.Auth.hasRole(['project_director', 'ceo']);
+                    const isAdmin = isSuperEventScope;
 
                     if (isAdmin) {
                         // Display admin override warning banner
