@@ -321,18 +321,13 @@
                     .eq('stage_id', assess.stage_id.id);
 
                 if (!isSuperEventScope) {
-                    if (isPDOrCoord) {
+                    if (isPDOrCoord || isJudge) {
                         if (allowedCentreIds.length > 0) {
                             query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
                         }
-                        // If no centres are allotted, do not filter by centre (allowing PD/coordinators to see all participants)
-                    } else if (isJudge && allowedCentreIds.length > 0) {
-                        query = query.in('participant_id.student_id.centre_id', allowedCentreIds);
+                        // If no centres are allotted / user is HQ All, do not filter by centre (allowing them to see all participants)
                     } else if (hasDirectCentreAccess && profile.centre_id) {
                         query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
-                    } else {
-                        // fallback empty if no access
-                        query = query.eq('participant_id.student_id.centre_id', '00000000-0000-0000-0000-000000000000');
                     }
                 }
 
