@@ -86,27 +86,39 @@
         // 2. Inject App Header
         const header = document.querySelector('.app-header');
         if (header) {
-            // Keep existing title element (like h1 or p)
-            const titleEl = header.querySelector('.header-title h1') || header.querySelector('h1') || document.createElement('h1');
-            const pageTitle = titleEl.textContent || 'Literacy India Portal';
+            // Ensure menu toggle exists
+            if (!header.querySelector('#menuToggle')) {
+                const toggleDiv = document.createElement('div');
+                toggleDiv.className = 'menu-toggle';
+                toggleDiv.id = 'menuToggle';
+                toggleDiv.style.display = 'none';
+                toggleDiv.innerHTML = '<span style="font-size: 1.5rem;">☰</span>';
+                header.insertBefore(toggleDiv, header.firstChild);
+            }
 
-            const centreText = profile.centres ? profile.centres.centre_name : 'All Centres (HQ)';
+            // Ensure header actions exist
+            let headerActions = header.querySelector('.header-actions');
+            if (!headerActions) {
+                headerActions = document.createElement('div');
+                headerActions.className = 'header-actions';
+                header.appendChild(headerActions);
+            }
+
             const formattedRoles = formatRoles(profile.roles);
+            headerActions.innerHTML = `<span class="badge badge-active user-role-display">${escapeHTML(formattedRoles)}</span>`;
 
-            header.innerHTML = `
-                <div class="menu-toggle" id="menuToggle" style="display: none;">
-                    <span style="font-size: 1.5rem;">☰</span>
-                </div>
-                
-                <div class="header-title">
-                    <h1 id="headerTitleText">${escapeHTML(pageTitle)}</h1>
-                    <p class="user-centre-display">${escapeHTML(centreText)}</p>
-                </div>
-                
-                <div class="header-actions">
-                    <span class="badge badge-active user-role-display">${escapeHTML(formattedRoles)}</span>
-                </div>
-            `;
+            // Update user centre display if it exists, otherwise create it in .header-title
+            const centreText = profile.centres ? profile.centres.centre_name : 'All Centres (HQ)';
+            let titleContainer = header.querySelector('.header-title');
+            if (titleContainer) {
+                let centreDisplay = titleContainer.querySelector('.user-centre-display');
+                if (!centreDisplay) {
+                    centreDisplay = document.createElement('p');
+                    centreDisplay.className = 'user-centre-display';
+                    titleContainer.appendChild(centreDisplay);
+                }
+                centreDisplay.textContent = centreText;
+            }
 
             // Re-bind menu toggle responsive event drawer
             const menuToggle = header.querySelector('#menuToggle');
