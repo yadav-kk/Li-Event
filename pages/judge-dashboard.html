@@ -103,6 +103,13 @@
     </div>
 
     <script>
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin', 'prog_admin', 'project_director', 'ceo']);
             if (!isSessionValid) return;
@@ -129,9 +136,33 @@
             if (!window.supabaseClient) return;
 
             try {
+                const profile = window.Auth.getUserProfile();
+                const userRole = profile ? profile.role : null;
+                const userCentreId = profile ? profile.centre_id : null;
+                const userEmail = profile ? profile.email : null;
+                const userId = profile ? profile.id : null;
+                const isSuper = ['super_admin', 'prog_admin', 'project_director', 'ceo'].includes(userRole) || userEmail === 'judge@test.com';
+
                 let query = window.supabaseClient
                     .from('event_assessments')
-                    .select('*, stage_id!inner(name, status, event_id!inner(name, status))')
+                    .select(`
+                        *,
+                        stage_id!inner(
+                            name, 
+                            status, 
+                            start_datetime,
+                            end_datetime,
+                            event_id!inner(
+                                id,
+                                name, 
+                                status
+                            )
+                        ),
+                        assessment_assignments(
+                            judge_id,
+                            centre_id
+                        )
+                    `)
                     .eq('status', 'ACTIVE')
                     .in('stage_id.event_id.status', ['PRACTICE', 'ASSESSMENT', 'IN_PROGRESS'])
                     .order('sequence', { ascending: true });
@@ -139,14 +170,60 @@
                 const { data: assessments, error: asErr } = await query;
                 if (asErr) throw asErr;
 
-                const hasAdminOverride = window.Auth.hasRole('super_admin');
+                // Fetch event centres if not super admin
+                let eventCentres = [];
+                if (!isSuper) {
+                    try {
+                        const { data: ecData } = await window.supabaseClient
+                            .from('event_centres')
+                            .select('event_id, centre_id');
+                        eventCentres = ecData || [];
+                    } catch (err) {
+                        console.error("Error fetching event_centres:", err);
+                    }
+                }
+
+                // Fetch active features mapping separately (failsafe check)
+                let featuresMap = [];
+                try {
+                    const { data: fMapData } = await window.supabaseClient
+                        .from('event_features_mapping')
+                        .select('event_id, feature_code')
+                        .eq('is_enabled', true);
+                    featuresMap = fMapData || [];
+                } catch (err) {
+                    console.log("event_features_mapping table does not exist yet. Please run the SQL migration script.");
+                }
 
                 const tbody = document.querySelector('#judgeAssessTable tbody');
                 tbody.innerHTML = '';
 
-                if (assessments && assessments.length > 0) {
+                // Filter assessments list based on access rules
+                const accessibleAssessments = (assessments || []).filter(a => {
+                    if (isSuper) return true;
+
+                    // Check if explicitly assigned to this assessment
+                    const isAssigned = a.assessment_assignments && a.assessment_assignments.some(as => as.judge_id === userId);
+                    if (isAssigned) {
+                        a._accessType = 'ASSIGNED';
+                        return true;
+                    }
+
+                    // Check if Centre Grading (direct marking) is enabled for this event
+                    const isCentreGradingEnabled = featuresMap.some(f => f.event_id === a.stage_id.event_id.id && f.feature_code === 'allow_centre_marking');
+                    const isCentreRegistered = eventCentres.some(ec => ec.event_id === a.stage_id.event_id.id && ec.centre_id === userCentreId);
+                    
+                    if (isCentreGradingEnabled && isCentreRegistered) {
+                        a._accessType = 'CENTRE_ASSESSOR';
+                        return true;
+                    }
+
+                    return false;
+                });
+
+                if (accessibleAssessments.length > 0) {
                     const now = new Date();
-                    assessments.forEach(a => {
+                    accessibleAssessments.forEach(a => {
                         const start = a.start_datetime ? new Date(a.start_datetime) : null;
                         const end = a.end_datetime ? new Date(a.end_datetime) : null;
 
@@ -156,14 +233,23 @@
                         
                         if (start && now < start) {
                             badgeColor = 'draft'; // gray
-                            statusText = `Upcoming (Opens ${start.toLocaleString()})${hasAdminOverride ? ' [Override]' : ''}`;
-                            isBtnDisabled = !hasAdminOverride;
+                            statusText = `Upcoming (Opens ${start.toLocaleString()})${isSuper ? ' [Override]' : ''}`;
+                            isBtnDisabled = !isSuper;
                         } else if (end && now > end) {
                             badgeColor = 'danger'; // red
-                            statusText = `Closed (Ended ${end.toLocaleString()})${hasAdminOverride ? ' [Override]' : ''}`;
-                            isBtnDisabled = !hasAdminOverride;
+                            statusText = `Closed (Ended ${end.toLocaleString()})${isSuper ? ' [Override]' : ''}`;
+                            isBtnDisabled = !isSuper;
                         } else {
                             statusText = `Open (Closes ${end ? end.toLocaleString() : 'N/A'})`;
+                        }
+
+                        let accessTypeBadge = '';
+                        if (isSuper) {
+                            accessTypeBadge = '<br><span class="badge badge-completed" style="background-color: var(--primary); font-size: 0.7rem; margin-top: 4px;">Admin Override</span>';
+                        } else if (a._accessType === 'ASSIGNED') {
+                            accessTypeBadge = '<br><span class="badge badge-completed" style="background-color: var(--success); font-size: 0.7rem; margin-top: 4px;">Assigned Judge</span>';
+                        } else if (a._accessType === 'CENTRE_ASSESSOR') {
+                            accessTypeBadge = '<br><span class="badge badge-completed" style="background-color: #6366f1; font-size: 0.7rem; margin-top: 4px;">Centre Assessor</span>';
                         }
 
                         let actionHtml = '';
@@ -176,10 +262,11 @@
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td>
-                                <strong>${a.stage_id.event_id.name}</strong><br>
-                                <small style="color: var(--text-muted);">${a.stage_id.name}</small>
+                                <strong>${escapeHTML(a.stage_id.event_id.name)}</strong><br>
+                                <small style="color: var(--text-muted);">${escapeHTML(a.stage_id.name)}</small>
+                                ${accessTypeBadge}
                             </td>
-                            <td>${a.name}</td>
+                            <td>${escapeHTML(a.name)}</td>
                             <td>${a.max_marks}</td>
                             <td><span class="badge badge-${badgeColor}">${statusText}</span></td>
                             <td>${actionHtml}</td>

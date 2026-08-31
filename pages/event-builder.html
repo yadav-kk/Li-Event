@@ -170,6 +170,14 @@
                         <textarea class="form-control" id="objective" rows="2" placeholder="Assess student proficiency..."></textarea>
                     </div>
 
+                    <!-- Event Features CMS Toggles -->
+                    <div class="form-group" style="margin-top: 12px; margin-bottom: 16px;">
+                        <label class="form-label" style="font-weight: bold;">Event Features & Add-ons</label>
+                        <div id="featuresToggleGroup" style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px; border: 1px solid var(--border-color); padding: 16px; border-radius: var(--radius-sm); background-color: var(--bg-base);">
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Loading system features...</span>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Participating Centres</label>
                         <div id="centresCheckboxGroup" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); background-color: var(--bg-base);">
@@ -296,13 +304,21 @@
 
     <!-- Wizard Core JS Logic -->
     <script>
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
         let currentStep = 1;
         let eventConfig = {
             basic: {},
             stages: [],
             assessments: {},
             criteria: {},
-            advancement: {}
+            advancement: {},
+            features: []
         };
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -314,6 +330,7 @@
             });
 
             await loadCentresCheckboxes();
+            await loadFeaturesCheckboxes();
 
             // Custom multi-select dropdown toggle
             const classSelectDropdown = document.getElementById('classSelectDropdown');
@@ -409,6 +426,21 @@
                 const selectedCentres = evCentres.map(c => c.centre_id);
                 centreCbs.forEach(cb => {
                     cb.checked = selectedCentres.includes(cb.value);
+                });
+
+                // Fetch event features mapping
+                const { data: evFeatures, error: efErr } = await window.supabaseClient
+                    .from('event_features_mapping')
+                    .select('feature_code')
+                    .eq('event_id', eventId)
+                    .eq('is_enabled', true);
+
+                if (efErr) throw efErr;
+
+                const enabledFeatureCodes = evFeatures ? evFeatures.map(ef => ef.feature_code) : [];
+                const featureCbs = document.querySelectorAll('.feature-cb');
+                featureCbs.forEach(cb => {
+                    cb.checked = enabledFeatureCodes.includes(cb.value);
                 });
 
                 // 3. Fetch stages (Phases)
@@ -559,6 +591,45 @@
             }
         }
 
+        async function loadFeaturesCheckboxes() {
+            if (!window.supabaseClient) return;
+            try {
+                const { data: features, error } = await window.supabaseClient
+                    .from('features')
+                    .select('code, name, description, default_enabled')
+                    .order('name');
+
+                if (error) throw error;
+
+                const group = document.getElementById('featuresToggleGroup');
+                group.innerHTML = '';
+
+                if (!features || features.length === 0) {
+                    group.innerHTML = `<span style="color: var(--text-muted); font-size: 0.9rem;">No dynamic features configured in CMS.</span>`;
+                    return;
+                }
+
+                features.forEach(f => {
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.flexDirection = 'column';
+                    div.style.gap = '4px';
+                    div.innerHTML = `
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: bold;">
+                            <input type="checkbox" class="feature-cb" value="${f.code}" ${f.default_enabled ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+                            <span>${escapeHTML(f.name)}</span>
+                        </label>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 26px; margin-top: 0; margin-bottom: 8px;">
+                            ${escapeHTML(f.description || '')}
+                        </p>
+                    `;
+                    group.appendChild(div);
+                });
+            } catch (err) {
+                console.error("Error loading features checkboxes:", err);
+            }
+        }
+
         function addStageItem() {
             const container = document.getElementById('stagesList');
             const seq = container.children.length + 1;
@@ -615,7 +686,8 @@
                     regStart: document.getElementById('regStart').value,
                     regEnd: document.getElementById('regEnd').value,
                     objective: document.getElementById('objective').value.trim(),
-                    centres: Array.from(document.querySelectorAll('.centre-cb:checked')).map(el => el.value)
+                    centres: Array.from(document.querySelectorAll('.centre-cb:checked')).map(el => el.value),
+                    features: Array.from(document.querySelectorAll('.feature-cb:checked')).map(el => el.value)
                 };
             } else if (step === 2) {
                 const stageElements = document.querySelectorAll('#stagesList .stage-item');
@@ -888,6 +960,7 @@
                             <p><strong>Code:</strong> ${eventConfig.basic.code}</p>
                             <p><strong>Academic Year:</strong> ${eventConfig.basic.year}</p>
                             <p><strong>Timeline:</strong> ${eventConfig.basic.startDate} to ${eventConfig.basic.endDate}</p>
+                            <p><strong>Active Features:</strong> ${eventConfig.basic.features && eventConfig.basic.features.length > 0 ? eventConfig.basic.features.join(', ') : 'None'}</p>
                         </div>
                         <div>
                             <h4 style="font-size: 1rem; margin-bottom: 8px;">Phases Map</h4>
@@ -1002,6 +1075,9 @@
 
                     const { error: delSt } = await window.supabaseClient.from('event_stages').delete().eq('event_id', editEventId);
                     if (delSt) throw delSt;
+
+                    const { error: delEf } = await window.supabaseClient.from('event_features_mapping').delete().eq('event_id', editEventId);
+                    if (delEf) throw delEf;
                 } else {
                     // Insert Root Event
                     const { data: evData, error: evErr } = await window.supabaseClient
@@ -1036,6 +1112,19 @@
                             });
                         if (ecErr) throw ecErr;
                     }
+                }
+
+                // Insert Event Features mapping
+                if (eventConfig.basic.features && eventConfig.basic.features.length > 0) {
+                    const efInserts = eventConfig.basic.features.map(fCode => ({
+                        event_id: event.id,
+                        feature_code: fCode,
+                        is_enabled: true
+                    }));
+                    const { error: efErr } = await window.supabaseClient
+                        .from('event_features_mapping')
+                        .insert(efInserts);
+                    if (efErr) throw efErr;
                 }
 
                 // Insert Stages

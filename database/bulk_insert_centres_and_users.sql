@@ -1,0 +1,68 @@
+-- BULK SEED SCRIPT FOR NEW CENTRES AND USERS
+BEGIN;
+
+-- 1. Insert Centres
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('41399046-2853-4e98-af91-0caf56c702ca', 'SAL-01', 'Salkiya Community Centre', 'Purulia', 'West Bengal', 'Purulia, WB', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('6d5d9511-c589-4d4e-8ea0-5e07c78a855e', 'CHI-01', 'Chigrighata Community Centre', 'Kolkata', 'West Bengal', 'Purulia, WB', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('83228ce4-a9e0-489a-8143-ae8b4cef7000', 'PR-01', 'Pratapur Community Centre', 'Purulia', 'West Bengal', 'Purulia, WB', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('3d23c4e6-b920-4e6e-85d2-ba9bb444b45d', 'LO-01', 'Lowakui Community Centre', 'Purulia', 'West Bengal', 'Purulia, WB', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('2e1b5c00-5173-4363-8669-b78c86986c39', 'BO-01', 'Baramasiya Community Centre', 'Bokaro', 'Jharkhand', 'Jharkhand', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('c5199630-9c00-45f9-bf78-05b410a7a215', 'SA-01', 'Sarbari Community Centre', 'Purulia', 'West Bengal', 'Purulia, WB', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('cfe8eb94-cd0d-4a82-8f98-805e49c2f6fb', 'JH-01', 'Jharna Community Centre', 'Bokaro', 'Jharkhand', 'Jharkhand', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('93f5f7b1-307c-4a36-9759-3797e0a33a5e', 'DL-03', 'Bhati Mines Community Centre', 'New Dehi', 'New Delhi', 'New Delhi', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('8274519f-81f3-4931-b944-a6530a941c13', 'LEH-01', 'Alchi Community Centre', 'Leh', 'Ladakh', 'Ladakh', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('84104307-8427-4b27-95e4-2100338b864c', 'RJ-01', 'Manahorthana Community Centre', 'Jhalawar', 'Rajasthan', 'Rajasthan', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('2822faa5-8ee3-4654-8909-9fa17cff2b0e', 'HYD-01', 'Baranagar Community Centre', 'Hyderabad', 'Hyderabad', 'Hyderabad', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('f3e12c3d-48c5-43d8-9771-300b5b82323a', 'HR-11', 'Mulladera Community Centre', 'Gurugram', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('2fc3d901-8848-4282-9e2e-f3f020877b71', 'HR-12', 'Mandkola Community Centre', 'Palwal', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('c29c4ba0-7e76-4507-8bef-8af7853de734', 'HR-13', 'Dharam Colony Community Centre', 'Gurugram', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('f65b83a9-dac1-4c12-9375-934276df6b22', 'HR-14', 'Carterpuri Community Centre', 'Gurugram', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('7befa332-2340-418c-8140-38e3649055d8', 'HR-15', 'Gupta Colony Community Centre', 'Gurugram', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('ee805f77-9134-4371-be5c-19dfac5d2609', 'DL-04', 'Bijwasan Community Centre', 'New Dehi', 'New Delhi', 'New Delhi', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('7eb95d60-b3da-4a86-83a7-fc71d8338848', 'HR-16', 'Vidhyapeeth', 'Gurugram', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+INSERT INTO public.centres (id, centre_code, centre_name, district, state, address, status) VALUES ('69528bf7-8ad6-4465-ba59-f9d035b35f41', 'HR-17', 'Community College', 'Gurugram', 'Haryana', 'Haryana', 'active') ON CONFLICT DO NOTHING;
+
+-- 2. Insert Users (Password: password123)
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('3d5b3a77-df13-4dbf-a447-65207d7b269f', 'Trina Roy', 'salkiya.hawrah@literacyindia.org', 'password123', 'active', '41399046-2853-4e98-af91-0caf56c702ca') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('e2d3833b-2ce3-4ff9-b890-dc762d2a1417', 'Ayantika', 'chingrighata.kolkata@literacyindia.org', 'password123', 'active', '6d5d9511-c589-4d4e-8ea0-5e07c78a855e') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('ff99ad07-3ba1-4634-a375-c66b445139f7', 'Arup Mahato', 'pratappur.purulia@literacyindia.org', 'password123', 'active', '83228ce4-a9e0-489a-8143-ae8b4cef7000') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('ad021f1f-5cf5-44e9-bc05-bb8c4c07f896', 'Arup Mahato', 'lowakui.purulia@literacyindia.org', 'password123', 'active', '3d23c4e6-b920-4e6e-85d2-ba9bb444b45d') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('477c3f66-e6aa-4a42-9f0f-7d44196b5c1b', 'Pradeep Kumar', 'barmasiya.bokaro@literacyindia.org', 'password123', 'active', '2e1b5c00-5173-4363-8669-b78c86986c39') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('4a12dd0d-b3b6-4d96-9ffc-2605ccdd9d58', 'Arup Mahato', 'sarbari.purulia@literacyindia.org', 'password123', 'active', 'c5199630-9c00-45f9-bf78-05b410a7a215') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('9b52021d-e8ce-416a-b0e0-896f0bc0f876', 'Pradeep Kumar', 'jharna.bokaro@literacyindia.org', 'password123', 'active', 'cfe8eb94-cd0d-4a82-8f98-805e49c2f6fb') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('273b5703-cff2-4384-9bd8-b026994a9b14', 'Naviender', 'bhatimines.delhi@literacyindia.org', 'password123', 'active', '93f5f7b1-307c-4a36-9759-3797e0a33a5e') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('39e23e7d-7ea4-4222-87f4-2d77acfd1512', 'Konchok', 'alchi.leh@literacyindia.org', 'password123', 'active', '8274519f-81f3-4931-b944-a6530a941c13') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('1f2f9209-6d99-4ac5-a7b3-f13a134a7337', 'Rajaram', 'manoharthana.jhalawad@literacyindia.org', 'password123', 'active', '84104307-8427-4b27-95e4-2100338b864c') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('9e2fde63-e042-42af-b25b-38f71047b06b', 'Anitha', 'balanagar.hyderabad@literacyindia.org', 'password123', 'active', '2822faa5-8ee3-4654-8909-9fa17cff2b0e') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('8e658bfe-9d2f-4082-ad38-dd23aca1c993', 'Sweta Tyagi', 'mullahera.gurugram@literacyindia.org', 'password123', 'active', 'f3e12c3d-48c5-43d8-9771-300b5b82323a') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('e4ac6bd5-3c92-4a95-8b8d-7799eea4cc99', 'Renu Jangid', 'mandkola.palwal@literacyindia.org', 'password123', 'active', '2fc3d901-8848-4282-9e2e-f3f020877b71') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('16feaf2a-fa30-4209-a19e-d8ac5b181f5e', 'Chandra Prakash', 'dharam.colony@literacyindia.org', 'password123', 'active', NULL) ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('36da94a1-e29f-4753-abbd-bf571acee0d3', 'Anurag', 'gupta.colony.gurugram@literacyindia.org', 'password123', 'active', '7befa332-2340-418c-8140-38e3649055d8') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('dd077dfb-b75d-46ce-a33f-ec334c77eadf', 'Amrita Singh', 'bijwasan1.delhi@literacyindia.org', 'password123', 'active', 'ee805f77-9134-4371-be5c-19dfac5d2609') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('534616d0-39e1-452f-8881-4932d573df55', 'GS Dubey', 'gsdubey@literacyindia.org', 'password123', 'active', '7eb95d60-b3da-4a86-83a7-fc71d8338848') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+INSERT INTO public.users (id, name, email, password, status, centre_id) VALUES ('43624f22-f296-4749-9930-6bec045b3348', 'Govind', 'govind.jangra.vpt@literacyindia.org', 'password123', 'active', '69528bf7-8ad6-4465-ba59-f9d035b35f41') ON CONFLICT (email) DO UPDATE SET password = 'password123', centre_id = EXCLUDED.centre_id;
+
+-- 3. Map Roles
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('3d5b3a77-df13-4dbf-a447-65207d7b269f', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('e2d3833b-2ce3-4ff9-b890-dc762d2a1417', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('ff99ad07-3ba1-4634-a375-c66b445139f7', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('ad021f1f-5cf5-44e9-bc05-bb8c4c07f896', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('477c3f66-e6aa-4a42-9f0f-7d44196b5c1b', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('4a12dd0d-b3b6-4d96-9ffc-2605ccdd9d58', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('9b52021d-e8ce-416a-b0e0-896f0bc0f876', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('273b5703-cff2-4384-9bd8-b026994a9b14', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('39e23e7d-7ea4-4222-87f4-2d77acfd1512', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('1f2f9209-6d99-4ac5-a7b3-f13a134a7337', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('9e2fde63-e042-42af-b25b-38f71047b06b', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('8e658bfe-9d2f-4082-ad38-dd23aca1c993', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('e4ac6bd5-3c92-4a95-8b8d-7799eea4cc99', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('16feaf2a-fa30-4209-a19e-d8ac5b181f5e', 'coordinator') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('36da94a1-e29f-4753-abbd-bf571acee0d3', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('dd077dfb-b75d-46ce-a33f-ec334c77eadf', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('534616d0-39e1-452f-8881-4932d573df55', 'centre_incharge') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_roles (user_id, role_id) VALUES ('43624f22-f296-4749-9930-6bec045b3348', 'centre_incharge') ON CONFLICT DO NOTHING;
+
+-- 4. Map Multiple Centres (for Coordinators / multi-centre users)
+INSERT INTO public.user_centres (user_id, centre_id) VALUES ('16feaf2a-fa30-4209-a19e-d8ac5b181f5e', 'c29c4ba0-7e76-4507-8bef-8af7853de734') ON CONFLICT DO NOTHING;
+INSERT INTO public.user_centres (user_id, centre_id) VALUES ('16feaf2a-fa30-4209-a19e-d8ac5b181f5e', 'f65b83a9-dac1-4c12-9375-934276df6b22') ON CONFLICT DO NOTHING;
+COMMIT;

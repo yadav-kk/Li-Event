@@ -150,34 +150,105 @@
                 // 1. Fetch assessment configuration details
                 const { data: assess, error: assErr } = await window.supabaseClient
                     .from('event_assessments')
-                    .select('*, stage_id!inner(id, name, event_id!inner(name))')
+                    .select('*, stage_id!inner(id, name, start_datetime, end_datetime, event_id!inner(id, name))')
                     .eq('id', assessmentId)
                     .single();
 
                 if (assErr) throw assErr;
 
+                // Check permissions and direct centre marking features
+                const profile = window.Auth.getUserProfile();
+                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo', 'final_judge']);
+                const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
+                const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
+
+                // Query if user is an event lead
+                let isEventLead = false;
+                if (profile) {
+                    const { data: leadData } = await window.supabaseClient
+                        .from('event_leads')
+                        .select('id')
+                        .eq('user_id', profile.id)
+                        .eq('event_id', assess.stage_id.event_id.id);
+                    isEventLead = leadData && leadData.length > 0;
+                }
+
+                // Super Event Scope = Admins, CEO, Main Judge, or designated Event Leads
+                isSuperEventScope = isSuperRole || (profile && profile.email === 'judge@test.com') || isEventLead;
+
+                let allowedCentreIds = [];
+                let isAssigned = false;
+                if (isPDOrCoord) {
+                    const { data: ucData } = await window.supabaseClient
+                        .from('user_centres')
+                        .select('centre_id')
+                        .eq('user_id', profile.id);
+                    allowedCentreIds = ucData ? ucData.map(uc => uc.centre_id) : [];
+                } else if (isJudge && profile) {
+                    const { data: assignData } = await window.supabaseClient
+                        .from('assessment_assignments')
+                        .select('centre_id')
+                        .eq('judge_id', profile.id)
+                        .eq('assessment_id', assessmentId);
+                    allowedCentreIds = assignData ? assignData.map(a => a.centre_id).filter(id => id) : [];
+                    isAssigned = assignData && assignData.length > 0;
+                }
+
+                // Check if allow_centre_marking feature is enabled for this event
+                let allowCentreMarking = false;
+                try {
+                    const { data: fMapping } = await window.supabaseClient
+                        .from('event_features_mapping')
+                        .select('is_enabled')
+                        .eq('event_id', assess.stage_id.event_id.id)
+                        .eq('feature_code', 'allow_centre_marking')
+                        .maybeSingle();
+                    allowCentreMarking = fMapping ? fMapping.is_enabled : false;
+                } catch (err) {
+                    console.log("event_features_mapping table not found or query failed.");
+                }
+
+                // Check if user's centre is mapped to the event
+                let isCentreMappedToEvent = false;
+                if (profile && profile.centre_id) {
+                    const { data: ecData } = await window.supabaseClient
+                        .from('event_centres')
+                        .select('centre_id')
+                        .eq('event_id', assess.stage_id.event_id.id)
+                        .eq('centre_id', profile.centre_id);
+                    isCentreMappedToEvent = ecData && ecData.length > 0;
+                }
+
+                const hasDirectCentreAccess = allowCentreMarking && isCentreMappedToEvent;
+                const hasAccess = isSuperEventScope || isPDOrCoord || isAssigned || hasDirectCentreAccess;
+
+                if (!hasAccess) {
+                    alert("Access Denied: You do not have permissions to grade this assessment.");
+                    window.location.href = "judge-dashboard.html";
+                    return;
+                }
+
                 document.getElementById('assessmentHeader').textContent = `Score Entry: ${assess.name}`;
                 document.getElementById('assessmentSub').textContent = `Event: ${assess.stage_id.event_id.name} | Stage: ${assess.stage_id.name} | Max Marks: ${assess.max_marks}`;
 
-                // Check if current date is within assessment date range
+                // Check if current date is within stage date range
                 const now = new Date();
-                const start = assess.start_datetime ? new Date(assess.start_datetime) : null;
-                const end = assess.end_datetime ? new Date(assess.end_datetime) : null;
+                const start = assess.stage_id.start_datetime ? new Date(assess.stage_id.start_datetime) : null;
+                const end = assess.stage_id.end_datetime ? new Date(assess.stage_id.end_datetime) : null;
                 
                 let isOutsideDateWindow = false;
                 let dateWarningText = '';
                 
                 if (start && now < start) {
                     isOutsideDateWindow = true;
-                    dateWarningText = `This assessment is Scheduled to open on ${start.toLocaleString()}.`;
+                    dateWarningText = `This stage is Scheduled to open on ${start.toLocaleString()}.`;
                 } else if (end && now > end) {
                     isOutsideDateWindow = true;
-                    dateWarningText = `This assessment ended on ${end.toLocaleString()}.`;
+                    dateWarningText = `This stage ended on ${end.toLocaleString()}.`;
                 }
 
                 if (isOutsideDateWindow) {
-                    // Check if current user is a system Administrator (Super Admin or Prog Admin)
-                    const isAdmin = window.Auth.hasRole('super_admin');
+                    const isAdmin = isSuperEventScope;
 
                     if (isAdmin) {
                         // Display admin override warning banner
@@ -238,43 +309,7 @@
                 });
 
                 // 3. Fetch Stage Participants
-                // Filter participants dynamically by the judge's assigned centre(s)
-                const profile = window.Auth.getUserProfile();
-                const isSuperRole = window.Auth.hasRole(['super_admin', 'prog_admin', 'ceo', 'final_judge']);
-                const isPDOrCoord = window.Auth.hasRole(['project_director', 'coordinator']);
-                const isJudge = window.Auth.hasRole(['judge', 'final_judge']);
-
-                // Query if user is an event lead
-                let isEventLead = false;
-                if (profile) {
-                    const { count: leadCount } = await window.supabaseClient
-                        .from('event_leads')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('user_id', profile.id)
-                        .eq('event_id', assess.stage_id.event_id.id);
-                    isEventLead = leadCount > 0;
-                }
-
-                // Super Event Scope = Admins, CEO, Mail Judge, or designated Event Leads
-                isSuperEventScope = isSuperRole || (profile && profile.email === 'judge@test.com') || isEventLead;
-
-                let allowedCentreIds = [];
-                if (isPDOrCoord) {
-                    const { data: ucData } = await window.supabaseClient
-                        .from('user_centres')
-                        .select('centre_id')
-                        .eq('user_id', profile.id);
-                    allowedCentreIds = ucData ? ucData.map(uc => uc.centre_id) : [];
-                } else if (isJudge) {
-                    // Fetch assigned centres from assessment_assignments for this specific assessment
-                    const { data: assignData } = await window.supabaseClient
-                        .from('assessment_assignments')
-                        .select('centre_id')
-                        .eq('judge_id', profile.id)
-                        .eq('assessment_id', assessmentId);
-                    allowedCentreIds = assignData ? assignData.map(a => a.centre_id).filter(id => id) : [];
-                }
-
+                // Filter participants dynamically by the judge's assigned centre(s) or direct centre access
                 let query = window.supabaseClient
                     .from('stage_participants')
                     .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id, centres!inner(id, centre_name)))')
@@ -288,8 +323,11 @@
                             // Return empty if no centres mapped
                             query = query.eq('participant_id.student_id.centre_id', '00000000-0000-0000-0000-000000000000');
                         }
-                    } else if (profile.centre_id) {
+                    } else if (hasDirectCentreAccess && profile.centre_id) {
                         query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
+                    } else {
+                        // fallback empty if no access
+                        query = query.eq('participant_id.student_id.centre_id', '00000000-0000-0000-0000-000000000000');
                     }
                 }
 
