@@ -438,16 +438,21 @@
                     cb.checked = selectedCentres.includes(cb.value);
                 });
 
-                // Fetch event features mapping
-                const { data: evFeatures, error: efErr } = await window.supabaseClient
-                    .from('event_features_mapping')
-                    .select('feature_code')
-                    .eq('event_id', eventId)
-                    .eq('is_enabled', true);
+                // Fetch event features mapping (failsafe check)
+                let enabledFeatureCodes = [];
+                try {
+                    const { data: evFeatures, error: efErr } = await window.supabaseClient
+                        .from('event_features_mapping')
+                        .select('feature_code')
+                        .eq('event_id', eventId)
+                        .eq('is_enabled', true);
 
-                if (efErr) throw efErr;
+                    if (efErr) throw efErr;
+                    enabledFeatureCodes = evFeatures ? evFeatures.map(ef => ef.feature_code) : [];
+                } catch (err) {
+                    console.log("event_features_mapping table not available in cache yet:", err.message);
+                }
 
-                const enabledFeatureCodes = evFeatures ? evFeatures.map(ef => ef.feature_code) : [];
                 const featureCbs = document.querySelectorAll('.feature-cb');
                 featureCbs.forEach(cb => {
                     cb.checked = enabledFeatureCodes.includes(cb.value);
@@ -1163,8 +1168,12 @@
                     const { error: delSt } = await window.supabaseClient.from('event_stages').delete().eq('event_id', editEventId);
                     if (delSt) throw delSt;
 
-                    const { error: delEf } = await window.supabaseClient.from('event_features_mapping').delete().eq('event_id', editEventId);
-                    if (delEf) throw delEf;
+                    try {
+                        const { error: delEf } = await window.supabaseClient.from('event_features_mapping').delete().eq('event_id', editEventId);
+                        if (delEf) throw delEf;
+                    } catch (err) {
+                        console.warn("Could not delete from event_features_mapping:", err.message);
+                    }
 
                     const { error: delEl } = await window.supabaseClient.from('event_leads').delete().eq('event_id', editEventId);
                     if (delEl) throw delEl;
@@ -1210,10 +1219,14 @@
                         feature_code: fCode,
                         is_enabled: true
                     }));
-                    const { error: efErr } = await window.supabaseClient
-                        .from('event_features_mapping')
-                        .insert(efInserts);
-                    if (efErr) throw efErr;
+                    try {
+                        const { error: efErr } = await window.supabaseClient
+                            .from('event_features_mapping')
+                            .insert(efInserts);
+                        if (efErr) throw efErr;
+                    } catch (err) {
+                        console.warn("Could not insert event_features_mapping:", err.message);
+                    }
                 }
 
                 // Insert Event Leads mapping
