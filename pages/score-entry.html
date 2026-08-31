@@ -63,7 +63,12 @@
                         <strong class="user-name-display" style="margin-left: 4px;">Assessor</strong>
                     </div>
                     
-                    <div style="display: flex; gap: 12px;">
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="exportCSVTemplate()" style="background-color: var(--background); border: 1px solid var(--border);">Download Template</button>
+                        <label class="btn btn-secondary" style="margin-bottom: 0; cursor: pointer; background-color: var(--background); border: 1px solid var(--border);">
+                            Upload CSV
+                            <input type="file" id="csvScoreFile" accept=".csv" onchange="importCSVScores(event)" style="display: none;">
+                        </label>
                         <button class="btn btn-secondary" id="saveDraftBtn" onclick="saveAllScores('DRAFT')">Save Drafts</button>
                         <button class="btn btn-primary" id="submitBtn" onclick="saveAllScores('SUBMITTED')">Submit Score Sheet</button>
                     </div>
@@ -71,6 +76,18 @@
 
                 <div id="errorBanner" style="display: none; padding: 12px; border-radius: var(--radius-sm); background-color: var(--danger-light); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.85rem; margin-bottom: 24px;"></div>
                 <div id="successBanner" style="display: none; padding: 12px; border-radius: var(--radius-sm); background-color: var(--success-light); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); font-size: 0.85rem; margin-bottom: 24px;"></div>
+
+                <!-- Search & Filters -->
+                <div style="display: flex; gap: 16px; margin-bottom: 16px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <input type="text" id="searchParticipant" class="form-control" placeholder="Search by participant name or ID..." oninput="debounceFilterMatrix()" style="padding: 8px 12px;">
+                    </div>
+                    <div style="width: 220px; min-width: 150px;">
+                        <select id="centreFilterMatrix" class="form-control" onchange="filterMatrix()" style="padding: 8px 12px;">
+                            <option value="">All Centres</option>
+                        </select>
+                    </div>
+                </div>
 
                 <!-- Main Matrix Card -->
                 <div class="card">
@@ -273,11 +290,26 @@
                     } else if (profile.centre_id) {
                         query = query.eq('participant_id.student_id.centre_id', profile.centre_id);
                     }
-                }
-
-                const { data: spList, error: spErr } = await query;
+                              const { data: spList, error: spErr } = await query;
                 if (spErr) throw spErr;
                 participants = spList;
+
+                // Load and populate centres select dropdown
+                const { data: allCentres } = await window.supabaseClient
+                    .from('centres')
+                    .select('*')
+                    .eq('status', 'active');
+                
+                const centreSelect = document.getElementById('centreFilterMatrix');
+                centreSelect.innerHTML = '<option value="">All Centres</option>';
+                if (allCentres) {
+                    allCentres.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.centre_name;
+                        centreSelect.appendChild(opt);
+                    });
+                }
 
                 // 4. Fetch existing scores entered for this assessment by this judge
                 const { data: existingScores, error: scErr } = await window.supabaseClient
@@ -313,18 +345,20 @@
             }
         }
 
-        function renderScoreMatrix() {
+        function renderScoreMatrix(listToRender) {
             const tbody = document.querySelector('#scoreMatrixTable tbody');
             tbody.innerHTML = '';
 
-            if (participants.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${4 + criteriaList.length}" style="text-align: center; color: var(--text-muted);">No participants mapped to this stage for your centre.</td></tr>`;
+            const list = listToRender || participants;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${4 + criteriaList.length}" style="text-align: center; color: var(--text-muted);">No matching participants found.</td></tr>`;
                 return;
             }
 
             const fragment = document.createDocumentFragment();
 
-            participants.forEach(sp => {
+            list.forEach(sp => {
                 const sInfo = sp.participant_id.student_id;
                 const rec = scoreRecords[sp.id] || { total_score: 0, remarks: '', status: 'DRAFT', criteria: {} };
                 
@@ -374,6 +408,7 @@
                                value="${rec.remarks}" 
                                placeholder="Add feedback"
                                ${isLocked ? 'disabled' : ''}
+                               oninput="updateStudentRemarks(this.parentElement.parentElement)"
                                style="min-width: 140px;">
                     </td>
                 `;
@@ -386,13 +421,37 @@
         }
 
         function updateStudentTotalScore(rowEl) {
+            const spId = rowEl.getAttribute('data-sp-id');
             let total = 0;
             const inputs = rowEl.querySelectorAll('.crit-input');
+            
+            if (!scoreRecords[spId]) {
+                scoreRecords[spId] = { total_score: 0, remarks: '', status: 'DRAFT', criteria: {} };
+            }
+            
             inputs.forEach(inp => {
-                const val = parseFloat(inp.value) || 0;
-                total += val;
+                const critId = inp.getAttribute('data-crit-id');
+                const valStr = inp.value.trim();
+                if (valStr !== '') {
+                    const val = parseFloat(valStr) || 0;
+                    scoreRecords[spId].criteria[critId] = val;
+                    total += val;
+                } else {
+                    delete scoreRecords[spId].criteria[critId];
+                }
             });
+            
+            scoreRecords[spId].total_score = total;
             rowEl.querySelector('.total-display').value = total.toFixed(2);
+        }
+
+        function updateStudentRemarks(rowEl) {
+            const spId = rowEl.getAttribute('data-sp-id');
+            const remarksVal = rowEl.querySelector('.remarks-input').value.trim();
+            if (!scoreRecords[spId]) {
+                scoreRecords[spId] = { total_score: 0, remarks: '', status: 'DRAFT', criteria: {} };
+            }
+            scoreRecords[spId].remarks = remarksVal;
         }
 
         async function saveAllScores(statusString) {
@@ -404,7 +463,6 @@
             successDiv.style.display = 'none';
 
             const profile = window.Auth.getUserProfile();
-            const rows = document.querySelectorAll('#scoreMatrixTable tbody tr');
 
             if (statusString === 'SUBMITTED') {
                 const conf = confirm("Are you sure you want to Submit this score sheet? This will lock edit access for you.");
@@ -412,57 +470,56 @@
             }
 
             try {
-                // Loop through rows and insert
-                for (const row of rows) {
-                    const spId = row.getAttribute('data-sp-id');
-                    if (!spId) continue;
+                // Loop through all loaded participants (even if currently filtered out in the UI)
+                for (const sp of participants) {
+                    const spId = sp.id;
+                    const rec = scoreRecords[spId];
+                    if (!rec) continue; // Skip if no scores entered at all
 
-                    const totalScore = parseFloat(row.querySelector('.total-display').value) || 0;
-                    const remarks = row.querySelector('.remarks-input').value.trim();
-                    const inputs = row.querySelectorAll('.crit-input');
+                    const totalScore = rec.total_score || 0;
+                    const remarks = rec.remarks ? rec.remarks.trim() : '';
 
                     // 1. Check if score matrix is complete/valid
                     let skipRow = false;
                     const critData = [];
                     
-                    for (const inp of inputs) {
-                        const critId = inp.getAttribute('data-crit-id');
-                        const maxVal = parseFloat(inp.getAttribute('data-max'));
-                        const valStr = inp.value.trim();
+                    for (const crit of criteriaList) {
+                        const val = rec.criteria[crit.id];
 
-                        if (valStr === '') {
-                            // If draft, we allow incomplete records. If submitted, require all fields
+                        if (val === undefined || val === null || val === '') {
+                            // If submitted, require all fields
                             if (statusString === 'SUBMITTED') {
-                                throw new Error("All criteria fields must be filled before submitting scores.");
+                                throw new Error(`All criteria fields must be filled before submitting. Missing marks for student ${sp.participant_id.student_id.name}.`);
                             } else {
                                 skipRow = true;
                                 break;
                             }
                         }
 
-                        const val = parseFloat(valStr) || 0;
-                        if (val < 0 || val > maxVal) {
-                            throw new Error(`Score limit error: criteria score ${val} exceeds max ${maxVal}.`);
+                        const numericVal = parseFloat(val);
+                        const maxVal = parseFloat(crit.max_marks);
+                        if (numericVal < 0 || numericVal > maxVal) {
+                            throw new Error(`Score limit error: criteria score ${numericVal} exceeds max ${maxVal} for student ${sp.participant_id.student_id.name}.`);
                         }
                         
-                        critData.push({ critId, val });
+                        critData.push({ critId: crit.id, val: numericVal });
                     }
 
                     if (skipRow) continue; // Skip saving empty drafts for specific rows
 
                     // 2. Fetch or Create primary score record in assessment_scores
-                    const existingRec = scoreRecords[spId];
                     let scoreId;
 
-                    if (existingRec && existingRec.score_id) {
+                    if (rec.score_id) {
                         // Update
-                        scoreId = existingRec.score_id;
+                        scoreId = rec.score_id;
                         const { error: updErr } = await window.supabaseClient
                             .from('assessment_scores')
                             .update({
                                 total_score: totalScore,
-                                remarks,
-                                status: statusString
+                                remarks: remarks,
+                                status: statusString,
+                                updated_at: new Date().toISOString()
                             })
                             .eq('id', scoreId);
 
@@ -476,7 +533,7 @@
                                 stage_participant_id: spId,
                                 judge_id: profile.id,
                                 total_score: totalScore,
-                                remarks,
+                                remarks: remarks,
                                 status: statusString
                             })
                             .select()
@@ -484,6 +541,7 @@
 
                         if (insErr) throw insErr;
                         scoreId = newScore.id;
+                        rec.score_id = scoreId; // cache it locally
                     }
 
                     // 3. Upsert criteria subscores
@@ -513,6 +571,218 @@
                 errorDiv.textContent = err.message || "Failed to update participant score sheet.";
                 errorDiv.style.display = 'block';
             }
+        }
+
+        // CSV Import/Export & Filter Operations
+        function exportCSVTemplate() {
+            if (criteriaList.length === 0 || participants.length === 0) {
+                alert("Scoring matrix is empty or not loaded yet.");
+                return;
+            }
+
+            // Build dynamic headers
+            const headers = ['Participant ID', 'Participant Name'];
+            criteriaList.forEach(crit => {
+                headers.push(`${crit.name} (Max: ${crit.max_marks})`);
+            });
+            headers.push('Remarks');
+
+            let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
+
+            // Build rows
+            participants.forEach(sp => {
+                const sInfo = sp.participant_id.student_id;
+                const rec = scoreRecords[sp.id] || { total_score: 0, remarks: '', criteria: {} };
+
+                const row = [sInfo.student_id, sInfo.name];
+                criteriaList.forEach(crit => {
+                    const score = rec.criteria[crit.id] !== undefined ? rec.criteria[crit.id] : '';
+                    row.push(score);
+                });
+                row.push(rec.remarks || '');
+
+                csvContent += row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+
+            // Trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `ScoreSheet_Template_${assessmentId}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function importCSVScores(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = parseCSVText(text);
+                    if (lines.length < 2) {
+                        alert("Invalid CSV file structure.");
+                        return;
+                    }
+
+                    const headers = lines[0].map(h => h.trim().toLowerCase());
+                    const idIdx = headers.indexOf('participant id');
+                    const remarksIdx = headers.indexOf('remarks');
+
+                    if (idIdx === -1) {
+                        alert("CSV is missing the required 'Participant ID' column.");
+                        return;
+                    }
+
+                    // Map criteria headers to criteria IDs
+                    const critHeaderMap = {};
+                    criteriaList.forEach(crit => {
+                        const critIdx = headers.findIndex(h => h.includes(crit.name.toLowerCase()));
+                        if (critIdx !== -1) {
+                            critHeaderMap[crit.id] = critIdx;
+                        }
+                    });
+
+                    let importCount = 0;
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const row = lines[i];
+                        if (row.length === 0 || (row.length === 1 && row[0] === '')) continue;
+
+                        const participantId = row[idIdx]?.trim();
+                        if (!participantId) continue;
+
+                        const sp = participants.find(item => item.participant_id.student_id.student_id === participantId);
+                        if (!sp) continue;
+
+                        const spId = sp.id;
+                        if (!scoreRecords[spId]) {
+                            scoreRecords[spId] = { total_score: 0, remarks: '', status: 'DRAFT', criteria: {} };
+                        }
+
+                        let total = 0;
+                        criteriaList.forEach(crit => {
+                            const headerIdx = critHeaderMap[crit.id];
+                            if (headerIdx !== undefined && row[headerIdx] !== undefined) {
+                                const scoreValStr = row[headerIdx].trim();
+                                if (scoreValStr !== '') {
+                                    const scoreVal = parseFloat(scoreValStr);
+                                    if (!isNaN(scoreVal)) {
+                                        scoreRecords[spId].criteria[crit.id] = scoreVal;
+                                        total += scoreVal;
+                                    }
+                                }
+                            }
+                        });
+
+                        scoreRecords[spId].total_score = total;
+
+                        if (remarksIdx !== -1 && row[remarksIdx] !== undefined) {
+                            scoreRecords[spId].remarks = row[remarksIdx].trim();
+                        }
+
+                        importCount++;
+                    }
+
+                    alert(`Imported scores for ${importCount} participants successfully! Please review the values in the table below and click "Save Drafts" or "Submit" to save.`);
+                    
+                    // Re-render scoring matrix
+                    filterMatrix();
+
+                } catch (err) {
+                    console.error("CSV import parsing error:", err);
+                    alert("Failed to parse CSV: " + err.message);
+                } finally {
+                    document.getElementById('csvScoreFile').value = '';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSVText(text) {
+            const result = [];
+            let row = [];
+            let inQuotes = false;
+            let currentField = '';
+
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
+
+                if (inQuotes) {
+                    if (char === '"') {
+                        if (nextChar === '"') {
+                            currentField += '"';
+                            i++;
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        currentField += char;
+                    }
+                } else {
+                    if (char === '"') {
+                        inQuotes = true;
+                    } else if (char === ',') {
+                        row.push(currentField);
+                        currentField = '';
+                    } else if (char === '\n' || char === '\r') {
+                        row.push(currentField);
+                        currentField = '';
+                        if (row.length > 0 && !(row.length === 1 && row[0] === '')) {
+                            result.push(row);
+                        }
+                        row = [];
+                        if (char === '\r' && nextChar === '\n') {
+                            i++;
+                        }
+                    } else {
+                        currentField += char;
+                    }
+                }
+            }
+            if (currentField || row.length > 0) {
+                row.push(currentField);
+                result.push(row);
+            }
+            return result;
+        }
+
+        let filterMatrixTimeout;
+        function debounceFilterMatrix() {
+            clearTimeout(filterMatrixTimeout);
+            filterMatrixTimeout = setTimeout(() => {
+                filterMatrix();
+            }, 300);
+        }
+
+        function filterMatrix() {
+            const searchVal = document.getElementById('searchParticipant').value.toLowerCase().trim();
+            const centreVal = document.getElementById('centreFilterMatrix').value;
+
+            let filtered = [...participants];
+
+            if (searchVal) {
+                filtered = filtered.filter(sp => {
+                    const sInfo = sp.participant_id.student_id;
+                    const name = sInfo.name.toLowerCase();
+                    const id = sInfo.student_id.toLowerCase();
+                    return name.includes(searchVal) || id.includes(searchVal);
+                });
+            }
+
+            if (centreVal) {
+                filtered = filtered.filter(sp => {
+                    const sInfo = sp.participant_id.student_id;
+                    return sInfo.centre_id === centreVal;
+                });
+            }
+
+            renderScoreMatrix(filtered);
         }
     </script>
 </body>
