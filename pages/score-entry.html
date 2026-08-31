@@ -277,7 +277,7 @@
 
                 let query = window.supabaseClient
                     .from('stage_participants')
-                    .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id))')
+                    .select('*, participant_id!inner(id, registration_number, student_id!inner(id, student_id, name, centre_id, centres!inner(id, centre_name)))')
                     .eq('stage_id', assess.stage_id.id);
 
                 if (!isSuperEventScope) {
@@ -297,22 +297,32 @@
                 if (spErr) throw spErr;
                 participants = spList;
 
-                // Load and populate centres select dropdown
-                const { data: allCentres } = await window.supabaseClient
-                    .from('centres')
-                    .select('*')
-                    .eq('status', 'active');
-                
+                // Populate centre select dropdown dynamically from loaded participants
+                const centreMap = new Map();
+                participants.forEach(sp => {
+                    const student = sp.participant_id?.student_id;
+                    if (student && student.centres) {
+                        const cId = student.centres.id;
+                        const cName = student.centres.centre_name;
+                        if (!centreMap.has(cId)) {
+                            centreMap.set(cId, { name: cName, count: 0 });
+                        }
+                        centreMap.get(cId).count++;
+                    }
+                });
+
                 const centreSelect = document.getElementById('centreFilterMatrix');
                 centreSelect.innerHTML = '<option value="">All Centres</option>';
-                if (allCentres) {
-                    allCentres.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = c.centre_name;
-                        centreSelect.appendChild(opt);
-                    });
-                }
+                
+                // Sort centres alphabetically
+                const sortedCentres = Array.from(centreMap.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name));
+                
+                sortedCentres.forEach(([cId, info]) => {
+                    const opt = document.createElement('option');
+                    opt.value = cId;
+                    opt.textContent = `${info.name} (${info.count})`;
+                    centreSelect.appendChild(opt);
+                });
 
                 // 4. Fetch existing scores entered for this assessment by this judge
                 const { data: existingScores, error: scErr } = await window.supabaseClient
@@ -583,6 +593,27 @@
                 return;
             }
 
+            const searchVal = document.getElementById('searchParticipant').value.toLowerCase().trim();
+            const centreVal = document.getElementById('centreFilterMatrix').value;
+
+            let listToExport = [...participants];
+
+            if (searchVal) {
+                listToExport = listToExport.filter(sp => {
+                    const sInfo = sp.participant_id.student_id;
+                    const name = sInfo.name.toLowerCase();
+                    const id = sInfo.student_id.toLowerCase();
+                    return name.includes(searchVal) || id.includes(searchVal);
+                });
+            }
+
+            if (centreVal) {
+                listToExport = listToExport.filter(sp => {
+                    const sInfo = sp.participant_id.student_id;
+                    return sInfo.centre_id === centreVal;
+                });
+            }
+
             // Build dynamic headers
             const headers = ['Participant ID', 'Participant Name'];
             criteriaList.forEach(crit => {
@@ -593,7 +624,7 @@
             let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
 
             // Build rows
-            participants.forEach(sp => {
+            listToExport.forEach(sp => {
                 const sInfo = sp.participant_id.student_id;
                 const rec = scoreRecords[sp.id] || { total_score: 0, remarks: '', criteria: {} };
 
