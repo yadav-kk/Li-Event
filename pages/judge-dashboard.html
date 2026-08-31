@@ -124,7 +124,7 @@
 
             await fetchJudgeAssessments();
             
-            const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin', 'final_judge', 'project_director', 'ceo']);
+            const isSuper = window.Auth.hasRole(['super_admin', 'prog_admin']);
             if (isSuper) {
                 document.getElementById('adminPanelCard').style.display = 'block';
                 await fetchAdminAssessments();
@@ -170,6 +170,30 @@
 
                 const { data: assessments, error: asErr } = await query;
                 if (asErr) throw asErr;
+ 
+                 // Fetch stage dependencies for displaying "Depends on xyz"
+                 const eventIds = [...new Set((assessments || []).map(a => a.stage_id?.event_id?.id).filter(Boolean))];
+                 let stageDependencies = {};
+                 if (eventIds.length > 0) {
+                     try {
+                         const { data: stagesData } = await window.supabaseClient
+                             .from('event_stages')
+                             .select('id, name, sequence, event_id')
+                             .in('event_id', eventIds)
+                             .order('sequence', { ascending: true });
+                         
+                         if (stagesData) {
+                             stagesData.forEach(stage => {
+                                 const prev = stagesData.find(s => s.event_id === stage.event_id && s.sequence === stage.sequence - 1);
+                                 if (prev) {
+                                     stageDependencies[stage.id] = prev.name;
+                                 }
+                             });
+                         }
+                     } catch (err) {
+                         console.error("Error fetching stage dependencies:", err);
+                     }
+                 }
 
                 // Fetch event centres if not super admin
                 let eventCentres = [];
@@ -276,10 +300,19 @@
                         }
 
                         const tr = document.createElement('tr');
+                        const depStageName = stageDependencies[a.stage_id.id];
+                        const dependencyHtml = depStageName 
+                            ? `<br><small style="color: #6366f1; font-weight: 500; font-size: 0.72rem;">🔗 Depends on: ${escapeHTML(depStageName)}</small>` 
+                            : '';
+
                         tr.innerHTML = `
                             <td>
                                 <strong>${escapeHTML(a.stage_id.event_id.name)}</strong><br>
                                 <small style="color: var(--text-muted);">${escapeHTML(a.stage_id.name)}</small>
+                                ${dependencyHtml}
+                                <br><small style="color: var(--text-secondary); font-size: 0.72rem;">
+                                    Active: ${start ? start.toLocaleDateString() : 'N/A'} to ${end ? end.toLocaleDateString() : 'N/A'}
+                                </small>
                                 ${accessTypeBadge}
                             </td>
                             <td>${escapeHTML(a.name)}</td>
