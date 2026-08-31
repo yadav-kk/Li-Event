@@ -138,10 +138,25 @@
             if (!window.supabaseClient) return;
 
             try {
-                const { data: events, error: err } = await window.supabaseClient
-                    .from('events')
-                    .select('*')
-                    .order('created_at', { ascending: false });
+                const profile = window.Auth.getUserProfile();
+                const isSuperAdmin = profile?.role === 'super_admin';
+                const isProgAdmin = profile?.role === 'prog_admin';
+
+                let query = window.supabaseClient.from('events').select('*');
+
+                if (isProgAdmin && !isSuperAdmin) {
+                    // Fetch assigned event IDs
+                    const { data: leads, error: leadErr } = await window.supabaseClient
+                        .from('event_leads')
+                        .select('event_id')
+                        .eq('user_id', profile.id);
+                    
+                    if (leadErr) console.warn("Could not fetch event leads mappings:", leadErr.message);
+                    const eventIds = leads ? leads.map(l => l.event_id) : [];
+                    query = query.in('id', eventIds);
+                }
+
+                const { data: events, error: err } = await query.order('created_at', { ascending: false });
 
                 if (err) throw err;
 

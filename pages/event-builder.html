@@ -777,11 +777,13 @@
                     containers.forEach((c, index) => {
                         const name = c.querySelector('.assess-name').value.trim();
                         const marks = parseFloat(c.querySelector('.assess-marks').value) || 0;
+                        const priority = parseInt(c.querySelector('.assess-priority').value, 10) || 0;
                         if (name) {
                             eventConfig.assessments[st.sequence].push({
                                 sequence: index + 1,
                                 name,
-                                max_marks: marks
+                                max_marks: marks,
+                                tie_break_priority: priority
                             });
                         }
                     });
@@ -884,10 +886,14 @@
                                         ${isFirst ? '<label class="form-label">Assessment Name</label>' : ''}
                                         <input class="form-control assess-name" type="text" placeholder="e.g. Spelling" value="${ass.name}">
                                     </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        ${isFirst ? '<label class="form-label">Max Marks</label>' : ''}
+                                        <input class="form-control assess-marks" type="number" placeholder="20" value="${ass.max_marks}">
+                                    </div>
                                     <div class="form-group" style="flex: 1; display: flex; gap: 8px; align-items: flex-end;">
                                         <div style="flex: 1;">
-                                            ${isFirst ? '<label class="form-label">Max Marks</label>' : ''}
-                                            <input class="form-control assess-marks" type="number" placeholder="20" value="${ass.max_marks}">
+                                            ${isFirst ? '<label class="form-label">Priority</label>' : ''}
+                                            <input class="form-control assess-priority" type="number" placeholder="Priority" value="${ass.tie_break_priority || 0}">
                                         </div>
                                         ${removeBtn}
                                     </div>
@@ -904,6 +910,10 @@
                                 <div class="form-group" style="flex: 1;">
                                     <label class="form-label">Max Marks</label>
                                     <input class="form-control assess-marks" type="number" placeholder="20">
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Priority</label>
+                                    <input class="form-control assess-priority" type="number" placeholder="Priority" value="0">
                                 </div>
                             </div>
                         `;
@@ -1054,8 +1064,11 @@
                 <div class="form-group" style="flex: 2;">
                     <input class="form-control assess-name" type="text" placeholder="e.g. Writing">
                 </div>
+                <div class="form-group" style="flex: 1;">
+                    <input class="form-control assess-marks" type="number" placeholder="20" title="Max Marks">
+                </div>
                 <div class="form-group" style="flex: 1; display: flex; gap: 8px;">
-                    <input class="form-control assess-marks" type="number" placeholder="20">
+                    <input class="form-control assess-priority" type="number" placeholder="Priority" title="Tie-Break Priority (Higher is checked first)" value="0">
                     <button class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="padding: 8px 12px;">✖</button>
                 </div>
             `;
@@ -1270,6 +1283,7 @@
                                 name: ass.name,
                                 sequence: ass.sequence,
                                 max_marks: ass.max_marks,
+                                tie_break_priority: ass.tie_break_priority || 0,
                                 status: stage.status === 'SCHEDULED' ? 'ACTIVE' : 'DRAFT',
                                 start_datetime: stage.start_datetime,
                                 end_datetime: stage.end_datetime

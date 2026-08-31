@@ -224,8 +224,9 @@
                 if (accessibleAssessments.length > 0) {
                     const now = new Date();
                     accessibleAssessments.forEach(a => {
-                        const start = a.start_datetime ? new Date(a.start_datetime) : null;
-                        const end = a.end_datetime ? new Date(a.end_datetime) : null;
+                        // Target Stage Start/End limits for scoring window
+                        const start = a.stage_id?.start_datetime ? new Date(a.stage_id.start_datetime) : (a.start_datetime ? new Date(a.start_datetime) : null);
+                        const end = a.stage_id?.end_datetime ? new Date(a.stage_id.end_datetime) : (a.end_datetime ? new Date(a.end_datetime) : null);
 
                         let badgeColor = 'completed'; // green
                         let statusText = 'Open';
@@ -240,7 +241,21 @@
                             statusText = `Closed (Ended ${end.toLocaleString()})${isSuper ? ' [Override]' : ''}`;
                             isBtnDisabled = !isSuper;
                         } else {
-                            statusText = `Open (Closes ${end ? end.toLocaleString() : 'N/A'})`;
+                            // Calculate remaining countdown
+                            let countdownStr = '';
+                            if (end) {
+                                const diffMs = end - now;
+                                const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                                if (diffHrs < 24) {
+                                    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                                    countdownStr = ` (Closes in ${diffHrs}h ${diffMins}m!)`;
+                                    badgeColor = 'warning'; // yellow warning badge for < 24h
+                                } else {
+                                    const diffDays = Math.floor(diffHrs / 24);
+                                    countdownStr = ` (Closes in ${diffDays} day${diffDays > 1 ? 's' : ''})`;
+                                }
+                            }
+                            statusText = `Open${countdownStr}`;
                         }
 
                         let accessTypeBadge = '';

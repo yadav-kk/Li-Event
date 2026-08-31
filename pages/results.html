@@ -512,6 +512,18 @@
                     }
                 }
 
+                // Log audit action
+                const auditDesc = newStatus === 'QUALIFIED' 
+                    ? `Manually promoted student "${name}" to the next stage.`
+                    : newStatus === 'DISQUALIFIED'
+                    ? `Manually dropped/disqualifed student "${name}" from selection.`
+                    : `Manually reverted student "${name}" status to PENDING.`;
+                await logAuditAction(newStatus === 'QUALIFIED' ? 'MANUAL_PROMOTION' : 'MANUAL_DEMOTION', auditDesc, {
+                    student_name: name,
+                    participant_id: spRecord.participant_id,
+                    stage_id: currentStageId
+                });
+
                 alert(`Participant status updated successfully!`);
                 await fetchStageRankings();
             } catch (err) {
@@ -532,6 +544,8 @@
                 });
 
                 if (error) throw error;
+
+                await logAuditAction('RULES_EXECUTION', `Calculated automatic stage rankings and qualifications.`, { stage_id: currentStageId });
 
                 alert("Advancement rankings calculated successfully!");
                 await fetchStageRankings();
@@ -618,6 +632,11 @@
                     .update({ status: 'ACTIVE' })
                     .eq('stage_id', nextStage.id);
 
+                await logAuditAction('BULK_PROMOTION', `Confirmed and promoted finalists to Stage: ${nextStageName}.`, {
+                    current_stage_id: currentStageId,
+                    next_stage_id: nextStage ? nextStage.id : null
+                });
+
                 alert(`Finalists confirmed and promoted to: ${nextStage.name}!`);
                 await fetchStageRankings();
 
@@ -632,6 +651,25 @@
             const stageName = selectEl.options[selectEl.selectedIndex]?.text || 'stage';
             const cleanStageName = stageName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             window.ExportHelper.exportTableToCSV('resultsTable', `scoreboard_${cleanStageName}.csv`);
+        }
+
+        async function logAuditAction(actionType, description, metadata = {}) {
+            if (!window.supabaseClient) return;
+            try {
+                const profile = window.Auth.getUserProfile();
+                const userId = profile ? profile.id : null;
+                
+                await window.supabaseClient
+                    .from('audit_logs')
+                    .insert({
+                        user_id: userId,
+                        action_type: actionType,
+                        description: description,
+                        metadata: metadata
+                    });
+            } catch (err) {
+                console.warn("Failed to write audit log:", err.message);
+            }
         }
     </script>
 </body>
