@@ -225,7 +225,7 @@
                 }
 
                 const hasDirectCentreAccess = allowCentreMarking && isCentreMappedToEvent;
-                const hasAccess = isSuperEventScope || isPDOrCoord || isAssigned || hasDirectCentreAccess;
+                const hasAccess = isSuperEventScope || isPDOrCoord || isAssigned || hasDirectCentreAccess || isJudge;
 
                 if (!hasAccess) {
                     alert("Access Denied: You do not have permissions to grade this assessment.");
