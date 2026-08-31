@@ -119,6 +119,7 @@
         let criteriaList = [];
         let participants = [];
         let scoreRecords = {}; // mapping: stage_participant_id -> { score_id, total, remarks, criteria: { crit_id: val } }
+        let isSuperEventScope = false;
 
         document.addEventListener('DOMContentLoaded', async () => {
             const isSessionValid = await window.Auth.checkSessionRedirect(['judge', 'final_judge', 'super_admin', 'prog_admin', 'project_director', 'ceo']);
@@ -255,7 +256,7 @@
                 }
 
                 // Super Event Scope = Admins, CEO, Mail Judge, or designated Event Leads
-                const isSuperEventScope = isSuperRole || (profile && profile.email === 'judge@test.com') || isEventLead;
+                isSuperEventScope = isSuperRole || (profile && profile.email === 'judge@test.com') || isEventLead;
 
                 let allowedCentreIds = [];
                 if (isPDOrCoord) {
