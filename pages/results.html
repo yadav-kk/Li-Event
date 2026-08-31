@@ -419,14 +419,90 @@
             if (!confirm(confirmMsg)) return;
 
             try {
-                const { error } = await window.supabaseClient
+                // 1. Fetch current stage participant details to get stage and participant info
+                const { data: spRecord, error: spFetchErr } = await window.supabaseClient
+                    .from('stage_participants')
+                    .select('*, stage_id(id, event_id, sequence)')
+                    .eq('id', spId)
+                    .single();
+
+                if (spFetchErr) throw spFetchErr;
+
+                // 2. Update status in current stage
+                const { error: updErr } = await window.supabaseClient
                     .from('stage_participants')
                     .update({ qualification_status: newStatus })
                     .eq('id', spId);
 
-                if (error) throw error;
+                if (updErr) throw updErr;
 
-                alert(`Participant status updated to ${newStatus}.`);
+                // 3. Resolve next stage
+                const currentStage = spRecord.stage_id;
+                const { data: nextStage, error: nsErr } = await window.supabaseClient
+                    .from('event_stages')
+                    .select('*')
+                    .eq('event_id', currentStage.event_id)
+                    .eq('sequence', currentStage.sequence + 1)
+                    .maybeSingle();
+
+                if (nsErr) throw nsErr;
+
+                if (nextStage) {
+                    if (newStatus === 'QUALIFIED') {
+                        // Check if already exists in next stage
+                        const { data: existingSp } = await window.supabaseClient
+                            .from('stage_participants')
+                            .select('id')
+                            .eq('stage_id', nextStage.id)
+                            .eq('participant_id', spRecord.participant_id)
+                            .maybeSingle();
+
+                        if (!existingSp) {
+                            // Insert into next stage
+                            const { error: insErr } = await window.supabaseClient
+                                .from('stage_participants')
+                                .insert({
+                                    stage_id: nextStage.id,
+                                    participant_id: spRecord.participant_id,
+                                    qualification_status: 'PENDING',
+                                    qualification_source: `Manually Qualified/Promoted`,
+                                    attendance: 'PRESENT'
+                                });
+                            if (insErr) throw insErr;
+                        }
+
+                        // Activate the next stage and its assessments just in case they were drafts
+                        await window.supabaseClient
+                            .from('event_stages')
+                            .update({ status: 'SCHEDULED' })
+                            .eq('id', nextStage.id);
+
+                        await window.supabaseClient
+                            .from('event_assessments')
+                            .update({ status: 'ACTIVE' })
+                            .eq('stage_id', nextStage.id);
+
+                    } else {
+                        // Reverting or Disqualifying: delete from next stage if exists
+                        const { data: existingSp } = await window.supabaseClient
+                            .from('stage_participants')
+                            .select('id')
+                            .eq('stage_id', nextStage.id)
+                            .eq('participant_id', spRecord.participant_id)
+                            .maybeSingle();
+
+                        if (existingSp) {
+                            // Delete next stage participant (cascade will delete their scores in that stage)
+                            const { error: delErr } = await window.supabaseClient
+                                .from('stage_participants')
+                                .delete()
+                                .eq('id', existingSp.id);
+                            if (delErr) throw delErr;
+                        }
+                    }
+                }
+
+                alert(`Participant status updated successfully!`);
                 await fetchStageRankings();
             } catch (err) {
                 console.error("Error setting qualification status:", err);
@@ -456,24 +532,11 @@
             }
         }
 
-        // Confirm finalist lists and register them to next stage (SRS Section 40)
         async function confirmAndPromoteFinalists() {
             if (!window.supabaseClient || !currentStageId) return;
 
-            const conf = confirm("Do you want to confirm these finalists and promote them to Stage 2 (Championship)? This will lock selections for this stage.");
-            if (!conf) return;
-
             try {
-                // 1. Lock qualification status to CONFIRMED for qualified students
-                const { error: updErr } = await window.supabaseClient
-                    .from('stage_participants')
-                    .update({ qualification_status: 'CONFIRMED' })
-                    .eq('stage_id', currentStageId)
-                    .eq('qualification_status', 'QUALIFIED');
-
-                if (updErr) throw updErr;
-
-                // 2. Resolve NEXT stage in event (sequence = 2)
+                // 1. Resolve current stage and NEXT stage in event
                 const { data: currentStage } = await window.supabaseClient
                     .from('event_stages')
                     .select('*')
@@ -487,9 +550,24 @@
                     .select('*')
                     .eq('event_id', currentStage.event_id)
                     .eq('sequence', currentStage.sequence + 1)
-                    .single();
+                    .maybeSingle();
 
-                if (nsErr || !nextStage) {
+                if (nsErr) throw nsErr;
+
+                const nextStageName = nextStage ? nextStage.name : "the next stage";
+                const conf = confirm(`Do you want to confirm these finalists and promote them to ${nextStageName}? This will lock selections for this stage.`);
+                if (!conf) return;
+
+                // 2. Lock qualification status to CONFIRMED for qualified students
+                const { error: updErr } = await window.supabaseClient
+                    .from('stage_participants')
+                    .update({ qualification_status: 'CONFIRMED' })
+                    .eq('stage_id', currentStageId)
+                    .eq('qualification_status', 'QUALIFIED');
+
+                if (updErr) throw updErr;
+
+                if (!nextStage) {
                     alert("Qualification confirmed. No subsequent stage configured for this event.");
                     await fetchStageRankings();
                     return;
