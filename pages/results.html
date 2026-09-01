@@ -335,8 +335,7 @@
         }
 
         function renderLeaderboard() {
-            const userRole = window.Auth.getUserProfile()?.role;
-            const isPDOrAdmin = ['super_admin', 'prog_admin', 'judge', 'final_judge', 'project_director', 'ceo'].includes(userRole) || isUserEventLead;
+            const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'judge', 'final_judge', 'project_director', 'ceo']) || isUserEventLead;
 
             const confirmBtn = document.getElementById('confirmFinalistsBtn');
             if (confirmBtn) {
@@ -390,8 +389,7 @@
                 // Display Total and Badge Status
                 const badgeClass = sp.qualification_status.toLowerCase();
 
-                const userRole = window.Auth.getUserProfile()?.role;
-                const isPDOrAdmin = ['super_admin', 'prog_admin', 'judge', 'final_judge', 'project_director', 'ceo'].includes(userRole) || isUserEventLead;
+                const isPDOrAdmin = window.Auth.hasRole(['super_admin', 'prog_admin', 'judge', 'final_judge', 'project_director', 'ceo']) || isUserEventLead;
                 let actionsHtml = '';
                 if (isPDOrAdmin) {
                     if (sp.qualification_status === 'PENDING' || sp.qualification_status === 'DISQUALIFIED') {

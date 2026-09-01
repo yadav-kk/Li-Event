@@ -331,7 +331,7 @@
         };
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin']);
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'project_director', 'ceo']);
             if (!isSessionValid) return;
 
             document.getElementById('logoutBtn').addEventListener('click', () => {

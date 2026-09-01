@@ -302,9 +302,9 @@
 
             try {
                 const profile = window.Auth.getUserProfile();
-                const isSuperAdmin = profile?.role === 'super_admin';
-                const isProgAdmin = profile?.role === 'prog_admin';
-                const isPD = profile?.role === 'project_director';
+                const isSuperAdmin = window.Auth.hasRole('super_admin');
+                const isProgAdmin = window.Auth.hasRole('prog_admin');
+                const isPD = window.Auth.hasRole('project_director');
 
                 // Check active events query
                 let eventsQuery = window.supabaseClient.from('events').select('*');
