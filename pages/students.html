@@ -51,9 +51,9 @@
                     <h1>Participants Directory</h1>
                     <p>Enroll and list event participants across centres.</p>
                 </div>
-                <div class="header-actions" data-allowed-roles="super_admin, prog_admin, centre_incharge">
-                    <button class="btn btn-secondary" onclick="toggleImportCard()">Bulk Import CSV</button>
-                    <button class="btn btn-primary" onclick="openEnrollmentModal()">+ Register Participant</button>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator, project_director, ceo" onclick="toggleImportCard()">Bulk Import CSV</button>
+                    <button class="btn btn-primary" data-allowed-roles="super_admin, prog_admin, centre_incharge, coordinator, project_director, ceo" onclick="openEnrollmentModal()">+ Register Participant</button>
                 </div>
             </header>
 

@@ -30,7 +30,7 @@
                 { href: 'users.html', text: 'Users', roles: ['super_admin', 'prog_admin'] },
                 { href: 'judge-dashboard.html', text: 'Judge Panel', roles: ['judge', 'final_judge', 'super_admin', 'prog_admin', 'project_director', 'ceo'] },
                 { href: 'results.html', text: 'Results & Rankings', roles: ['all'] },
-                { href: 'evidence.html', text: 'Evidence Upload', roles: ['super_admin', 'prog_admin', 'centre_incharge', 'project_director', 'ceo'] },
+                { href: 'evidence.html', text: 'Evidence Upload', roles: ['super_admin', 'prog_admin', 'centre_incharge', 'project_director', 'ceo', 'judge', 'final_judge'] },
                 { href: 'reports.html', text: 'Reports', roles: ['super_admin', 'prog_admin', 'management', 'project_director', 'ceo'] }
             ];
 
@@ -105,7 +105,13 @@
             }
 
             const formattedRoles = formatRoles(profile.roles);
-            headerActions.innerHTML = `<span class="badge badge-active user-role-display">${escapeHTML(formattedRoles)}</span>`;
+            let roleBadge = headerActions.querySelector('.user-role-display');
+            if (!roleBadge) {
+                roleBadge = document.createElement('span');
+                roleBadge.className = 'badge badge-active user-role-display';
+                headerActions.appendChild(roleBadge);
+            }
+            roleBadge.textContent = formattedRoles;
 
             // Update user centre display if it exists, otherwise create it in .header-title
             const centreText = profile.centres ? profile.centres.centre_name : 'All Centres (HQ)';

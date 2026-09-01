@@ -95,7 +95,7 @@
 
             <section class="content-body">
                 
-                <div class="card" id="uploadCard" data-allowed-roles="centre_incharge, super_admin" style="margin-bottom: 24px;">
+                <div class="card" id="uploadCard" data-allowed-roles="centre_incharge, super_admin, prog_admin, project_director, ceo, judge, final_judge" style="margin-bottom: 24px;">
                     <div class="card-header">
                         <span class="card-title">Upload Verification Evidence</span>
                     </div>
@@ -229,7 +229,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'centre_incharge', 'project_director', 'ceo']);
+            const isSessionValid = await window.Auth.checkSessionRedirect(['super_admin', 'prog_admin', 'centre_incharge', 'project_director', 'ceo', 'judge', 'final_judge']);
             if (!isSessionValid) return;
 
             document.getElementById('logoutBtn').addEventListener('click', () => {
