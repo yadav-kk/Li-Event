@@ -119,6 +119,7 @@
                                 <label class="form-label">Evidence Type</label>
                                 <select id="evidenceType" class="form-control" required>
                                     <option value="Answer Sheet">Answer Sheet PDF</option>
+                                    <option value="Spreadsheet / Data">Spreadsheet / Data Sheet (Excel / CSV)</option>
                                     <option value="Event Photo">Event Photography</option>
                                     <option value="Consent Form">Parent Consent Form</option>
                                     <option value="Activity Video">Activity Video</option>
@@ -133,7 +134,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Select File to Upload (Google Drive - Max 100MB)</label>
-                                <input type="file" id="evidenceFile" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.mp4,.mov,.avi,.m4v,.mkv" required>
+                                <input type="file" id="evidenceFile" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.mp4,.mov,.avi,.m4v,.mkv,.csv,.xlsx,.xls,.doc,.docx" required>
                             </div>
                         </div>
                         <button type="submit" id="uploadBtn" class="btn btn-primary" style="margin-top: 8px;">Upload & Submit Evidence</button>
@@ -687,7 +688,7 @@
 
             const metadata = {
                 name: newFileName,
-                mimeType: file.type,
+                mimeType: file.type || 'application/octet-stream',
                 parents: [rootFolderId]
             };
 
